@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ de8d7900-089b-11ed-07e3-275f5a9ade1d
-using CSV, DataFrames,LowRankModels, Statistics, CairoMakie,PyCall,PyPlot
+using CSV, DataFrames,LowRankModels, Statistics, CairoMakie,PyPlot
 
 # ╔═╡ c5cefbfb-1c54-4600-9d79-85072a68bd0f
 begin
@@ -14,7 +14,7 @@ begin
 	compounds = CSV.read("compounds.csv", DataFrame)
 	n = size(compounds)[1] #number of compounds
 
-	# add ATPS fractions data
+	# add ATPS (Aqueous Two-Phase System) forming fractions data
 	compounds[!,:ATPS_frac] = 1 .- sum.(eachrow(df))./n
 		
 end
@@ -76,7 +76,6 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 LowRankModels = "15d4e49f-4837-5ea3-a885-5b28bfa376dc"
-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
@@ -85,7 +84,6 @@ CSV = "~0.10.4"
 CairoMakie = "~0.8.10"
 DataFrames = "~0.21.8"
 LowRankModels = "~1.1.1"
-PyCall = "~1.93.1"
 PyPlot = "~2.10.0"
 """
 
