@@ -1,66 +1,108 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.17.7
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ c3f6fd50-1697-11ed-1af7-c717d141dfac
-using CSV, DataFrames,Statistics, LogExpFunctions, PyPlot,LinearAlgebra, Random 
+using CSV, DataFrames,Statistics, LogExpFunctions, PyPlot,LinearAlgebra, Random , StatsBase
+
+# ╔═╡ f924129b-4e85-45b4-95ce-6846d69d16f3
+md"## read in miscibility data"
 
 # ╔═╡ b9e723cf-3af9-40b7-a9de-61893c633d53
 begin
-	df = CSV.read("pairs.csv", DataFrame,header=0)
-	#raw_data = CSV.read("colormask.csv", DataFrame)
-	compounds = CSV.read("compounds.csv", DataFrame)
-	n = size(compounds)[1] #number of compounds
-	M = Array(df) 
+	df = CSV.read("pairs.csv", DataFrame, header=0)
+	M_complete = Array(df) # miscibility matrix
 end
+
+# ╔═╡ dc065d67-229c-4f3f-8912-45a2deb3bf5e
+@assert M_complete' == M_complete # assert symmetric
+
+# ╔═╡ a5e6d4ac-d1c4-44d5-9ea8-a599893376de
+@assert all(diag(M_complete) .== 1) # assert diagonal all ones
+
+# ╔═╡ b656b1bf-ab58-4831-929d-95961a7b1505
+n_compounds = size(M_complete)[1] #number of compounds
+
+# ╔═╡ 22531e96-f0f7-45c0-a327-53094a83ddcf
+CSV.read("compounds.csv", DataFrame)
+
+# ╔═╡ 915c174f-dbd1-42bb-92f0-1ccf7d319258
+compound_names = String.(CSV.read("compounds.csv", DataFrame)[:, :NAME])
+
+# ╔═╡ d6d83535-fa87-4de9-8ddc-0920a6bad075
+compound_classes = String.(CSV.read("compounds.csv", DataFrame)[:, :CLASS])
+
+# ╔═╡ ee675570-94ef-4061-9438-7e60a0e5dae1
+md"## introducing missing values"
+
+# ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
+# θ:fraction of missing entries
+# important note: we only pay attn to upper triangle of matrix.
+function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
+	n_compounds = size(M_complete)[1]
+
+	# make list of entries in upper diagonal of the matrix
+	all_entries = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds]
+	@assert length(all_entries) == (n_compounds ^ 2 - n_compounds) ÷ 2
+
+	# number of observed entries
+	nb_observed = floor(Int, θ * length(all_entries))
+
+	# sample observed tuples
+    ids_obs = sample(all_entries, nb_observed, replace=false)
+	# the rest are unobserved
+	ids_unobs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
+		             if !((i, j) in ids_obs)]
+	
+	# construct the matrix with missing values
+    M = zeros(Union{Int64, Missing}, n_compounds, n_compounds)
+	fill!(M, missing) # default missing
+	# fill in observed values
+	for (i, j) in ids_obs
+		M[i, j] = M_complete[i, j]
+	end
+	
+    return M, ids_obs, ids_unobs, all_entries
+end
+
+# ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
+M, ids_obs, ids_unobs, all_entries = sim_data_collection(0.5, M_complete)
+
+# ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
+md"## the loss function and its gradient"
 
 # ╔═╡ 5b66b823-d2c7-4e13-80e9-384e19e149e3
 # indicator function
-function ind(i,j,compounds)
-	r= 0
-	for i=1:size(compounds)[1]
-		if compounds[i,:CLASS] == compounds[j,:CLASS]
-			r = 1
-		else
-			r = 0
-		end
-	end
-		return r
+function same_class(i::Int, j::Int, compound_classes::Vector{String})
+	return compound_classes[i] == compound_classes[j]
 end
 
+# ╔═╡ 45d36237-a7d2-4833-add3-bbc95fc427e1
+same_class(1, 1, compound_classes)
+
 # ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-function loss(C,M,gamma)
-	l = 0
-	n = size(M)[1]
-	
-	for i=1:n
+function loss(C::Matrix{Float64}, 
+	          M::Matrix{Union{Missing, Int64}}, 
+	          ids_obs::Vector{Tuple{Int64, Int64}},
+	          γ::Float64)
+	l = 0.0
+	n_compounds = size(M)[1]
+
+	# loop over observed data
+	# loop over all pairs
+	for c = 1:n_compounds
 		x = C[i,:]
 		for j=1:n
 			y = C[j,:]
 			if i != j
-				l +=  -(M[i,j]*log(logistic(sum(x.*y)))+(1-M[i,j])*log(1-logistic(sum(x.*y)))) + gamma*(1-M[i,j])*sum((x-y).*transpose(x-y))
+				l +=  -(M[i,j]*log(logistic(sum(x.*y)))+(1-M[i,j])*log(1-logistic(sum(x.*y)))) + γ*(1-M[i,j])*sum((x-y).*transpose(x-y))
 			end
 		end
 	end
 	
 	return l
-end
-
-# ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
-function grad_loss(C,M,gamma,i)
-	g = 0
-	n = size(M)[1]
-	x = C[i,:]
-	for j=1:n
-		y = C[j,:]
-		if i != j
-			g = g .-((M[i,j]*(1-logistic(sum(x.*y)))-(1-M[i,j])*logistic(sum(x.*y)))).*y .+ 2*gamma*(1-M[i,j]).*(x-y)
-		end
-	end
-	
-	return g
 end
 
 # ╔═╡ f8f73c2f-e332-4b16-85cf-2729780a13ad
@@ -97,7 +139,7 @@ begin
 	l2 = zeros(steps)
 	k = 2
 	C1 = rand(Float64,(n,k))
-	C2 = rand(Float64,(n,k))
+	C_γ0 = rand(Float64,(n,k))
 	gamma = [0 1]
 	
 	for t=1:steps
@@ -108,6 +150,25 @@ begin
 		#l1[t] = dot((C1*transpose(C1)),M)
 		#l2[t] = dot((C2*transpose(C2)),M)
 	end
+end
+
+# ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
+function ∇_loss(C::Matrix{Float64}, 
+	           c::Int,
+	           M::Matrix{Union{Missing, Int64}}, 
+	           ids_obs::Vector{Tuple{Int64, Int64}},
+	           γ::Float64)
+	g = 0
+	n = size(M)[1]
+	x = C[i,:]
+	for j=1:n
+		y = C[j,:]
+		if i != j
+			g = g .-((M[i,j]*(1-logistic(sum(x.*y)))-(1-M[i,j])*logistic(sum(x.*y)))).*y .+ 2*gamma*(1-M[i,j]).*(x-y)
+		end
+	end
+	
+	return g
 end
 
 # ╔═╡ 387beb1f-3e2d-4014-85d6-2e253c0a18f7
@@ -124,6 +185,15 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
+md"## viz results
+1. plot latent vectors (or PCA of them if in higher dims); color by miscibility, different markers for different classes.
+2. confusion matrix on test data
+3. plot loss as function of iters
+
+and repeat with and without graph regularization.
+"
+
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 (C2*transpose(C2))
 
@@ -137,19 +207,21 @@ LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 CSV = "~0.10.4"
 DataFrames = "~0.21.8"
 LogExpFunctions = "~0.3.17"
 PyPlot = "~2.10.0"
+StatsBase = "~0.33.21"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.3"
+julia_version = "1.7.2"
 manifest_format = "2.0"
 
 [[deps.ArgTools]]
@@ -260,7 +332,7 @@ uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.9.1"
 
 [[deps.Downloads]]
-deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
+deps = ["ArgTools", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 
 [[deps.FilePathsBase]]
@@ -268,9 +340,6 @@ deps = ["Compat", "Dates", "Mmap", "Printf", "Test", "UUIDs"]
 git-tree-sha1 = "129b104185df66e408edd6625d480b7f9e9823a0"
 uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
 version = "0.9.18"
-
-[[deps.FileWatching]]
-uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -473,6 +542,18 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+[[deps.StatsAPI]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "f9af7f195fb13589dd2e2d57fdb401717d2eb1f6"
+uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
+version = "1.5.0"
+
+[[deps.StatsBase]]
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "d1bf48bfcc554a3761a133fe3a9bb01488e06916"
+uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+version = "0.33.21"
+
 [[deps.StructTypes]]
 deps = ["Dates", "UUIDs"]
 git-tree-sha1 = "d24a825a95a6d98c385001212dc9020d609f2d4f"
@@ -546,14 +627,27 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 
 # ╔═╡ Cell order:
 # ╠═c3f6fd50-1697-11ed-1af7-c717d141dfac
+# ╟─f924129b-4e85-45b4-95ce-6846d69d16f3
 # ╠═b9e723cf-3af9-40b7-a9de-61893c633d53
+# ╠═dc065d67-229c-4f3f-8912-45a2deb3bf5e
+# ╠═a5e6d4ac-d1c4-44d5-9ea8-a599893376de
+# ╠═b656b1bf-ab58-4831-929d-95961a7b1505
+# ╠═22531e96-f0f7-45c0-a327-53094a83ddcf
+# ╠═915c174f-dbd1-42bb-92f0-1ccf7d319258
+# ╠═d6d83535-fa87-4de9-8ddc-0920a6bad075
+# ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
+# ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
+# ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
+# ╟─eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 # ╠═5b66b823-d2c7-4e13-80e9-384e19e149e3
+# ╠═45d36237-a7d2-4833-add3-bbc95fc427e1
 # ╠═500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
 # ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
 # ╠═38e663bb-0de3-46c4-9e72-761ea22bc9a6
 # ╠═387beb1f-3e2d-4014-85d6-2e253c0a18f7
+# ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
