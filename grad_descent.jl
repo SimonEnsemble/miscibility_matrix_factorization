@@ -222,9 +222,17 @@ end
 begin
 	figure(figsize=(9, 9))
 	#fig, (ax1, ax2) = plt.subplots(1, 2)
-	scatter(C_γ[:, 1], C_γ[:, 2], edgecolor="k", c=compounds[:, :ATPS_frac], marker="s", cmap="gist_rainbow")
 
-	#scatter(C1[:, 1], C1[:, 3], edgecolor="k", c=compounds[:, :ATPS_frac], marker="s", cmap="gist_rainbow")
+	markers = zeros(n_compounds)
+
+	markers_dict = Dict("Polymer" => "s", "Protein" => "o", "Surfactant" => "^", "Salt" => "P")
+	
+	#for (i,class) in enumerate(compounds[:, :CLASS])
+		#markers[i] = markers_dict[class]
+	#end
+	
+	scatter(C_γ[:, 1], C_γ[:, 2], edgecolor="k", c=compounds[:, :ATPS_frac], marker=markers, cmap="gist_rainbow")
+
 
 	xlabel("latent dimension 1")
 	ylabel("latent dimension 2")
@@ -247,13 +255,13 @@ end
 sk = pyimport("sklearn.metrics")
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
-function cm(C, M_complete, ids_unobs)
+function cm(C, M_complete, ids_unobs,b,t)
 	
 	m_true = zeros(length(ids_unobs))
 	m_pred = zeros(length(ids_unobs))
 	
 	for (k,(i,j)) in enumerate(ids_unobs)
-		if abs((C*transpose(C))[i,j]) > 0.5
+		if abs((C*transpose(C))[i,j]-b) > t
 			m_pred[k] = 1
 		else
 			m_pred[k] = 0
@@ -272,7 +280,9 @@ md"## confusion matrix: w/ graph regularization"
 # ╔═╡ b52d0cb0-6ebb-4f5d-9762-ade7bc305746
 begin
 	#fig, (ax0, ax1) = subplots(2, 1)
-	cm1=cm(C_γ, M_complete, ids_unobs)
+	b = 0.3
+	t = 0.5
+	cm1=cm(C_γ, M_complete, ids_unobs,b,t)
 	fig1=sk.ConfusionMatrixDisplay(cm1).plot()
 	gcf()
 	
@@ -286,7 +296,7 @@ md"## confusion matrix: w/o graph regularization"
 
 # ╔═╡ b20e6084-afa4-4864-b32a-57614bdde09f
 begin
-	cm2=cm(C1, M_complete, ids_unobs)
+	cm2=cm(C1, M_complete, ids_unobs,b ,t)
 	fig2=sk.ConfusionMatrixDisplay(cm2).plot()
 	gcf()
 end
