@@ -1,11 +1,14 @@
 ### A Pluto.jl notebook ###
-# v0.17.7
+# v0.19.9
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ c3f6fd50-1697-11ed-1af7-c717d141dfac
 using CSV, DataFrames,Statistics, LogExpFunctions, PyPlot,LinearAlgebra, Random , StatsBase
+
+# ╔═╡ 43e0bde9-7910-46c7-a4d1-e3ec84eeb26e
+using PyCall
 
 # ╔═╡ f924129b-4e85-45b4-95ce-6846d69d16f3
 md"## read in miscibility data"
@@ -22,11 +25,19 @@ end
 # ╔═╡ a5e6d4ac-d1c4-44d5-9ea8-a599893376de
 @assert all(diag(M_complete) .== 1) # assert diagonal all ones
 
+# ╔═╡ 964f0898-3bb8-4cc4-9fb7-8e073e09c7a5
+
+
 # ╔═╡ b656b1bf-ab58-4831-929d-95961a7b1505
 n_compounds = size(M_complete)[1] #number of compounds
 
 # ╔═╡ 22531e96-f0f7-45c0-a327-53094a83ddcf
-CSV.read("compounds.csv", DataFrame)
+begin
+	compounds = CSV.read("compounds.csv", DataFrame)
+	# add ATPS (Aqueous Two-Phase System) forming fractions data
+	compounds[!,:ATPS_frac] = 1 .- sum.(eachrow(df))./n_compounds
+	compounds
+end
 
 # ╔═╡ 915c174f-dbd1-42bb-92f0-1ccf7d319258
 compound_names = String.(CSV.read("compounds.csv", DataFrame)[:, :NAME])
@@ -48,10 +59,10 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 	@assert length(all_entries) == (n_compounds ^ 2 - n_compounds) ÷ 2
 
 	# number of observed entries
-	nb_observed = floor(Int, θ * length(all_entries))
+	nb_observed = floor(Int, (1-θ) * length(all_entries))
 
 	# sample observed tuples
-    ids_obs = sample(all_entries, nb_observed, replace=false)
+    ids_obs = StatsBase.sample(all_entries, nb_observed, replace=false)
 	# the rest are unobserved
 	ids_unobs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
 		             if !((i, j) in ids_obs)]
@@ -62,6 +73,8 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 	# fill in observed values
 	for (i, j) in ids_obs
 		M[i, j] = M_complete[i, j]
+		M[j, i] = M_complete[i, j]
+		
 	end
 	
     return M, ids_obs, ids_unobs, all_entries
@@ -69,6 +82,9 @@ end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
 M, ids_obs, ids_unobs, all_entries = sim_data_collection(0.5, M_complete)
+
+# ╔═╡ 0aa5411e-896f-4487-93c3-9711f71bdb3a
+ids_obs
 
 # ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 md"## the loss function and its gradient"
@@ -85,19 +101,21 @@ same_class(1, 1, compound_classes)
 # ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
 function loss(C::Matrix{Float64}, 
 	          M::Matrix{Union{Missing, Int64}}, 
-	          ids_obs::Vector{Tuple{Int64, Int64}},
+	          #ids_obs::Vector{Tuple{Int64, Int64}},
 	          γ::Float64)
 	l = 0.0
 	n_compounds = size(M)[1]
+	
 
 	# loop over observed data
 	# loop over all pairs
 	for c = 1:n_compounds
-		x = C[i,:]
-		for j=1:n
+		js_obs = .! ismissing.(M[c, :])
+		x = C[c,:]
+		for j=1:n_compounds
 			y = C[j,:]
-			if i != j
-				l +=  -(M[i,j]*log(logistic(sum(x.*y)))+(1-M[i,j])*log(1-logistic(sum(x.*y)))) + γ*(1-M[i,j])*sum((x-y).*transpose(x-y))
+			if js_obs[j]
+				l +=  -(M[c,j]*log(logistic(sum(x.*y)))+(1-M[c,j])*log(1-logistic(sum(x.*y)))) + γ*same_class(c, j, compound_classes)*sum((x-y).*transpose(x-y))
 			end
 		end
 	end
@@ -105,27 +123,51 @@ function loss(C::Matrix{Float64},
 	return l
 end
 
+# ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
+function grad_loss(C::Matrix{Float64}, 
+	           c::Int,
+	           M::Matrix{Union{Missing, Int64}}, 
+	           #ids_obs::Vector{Tuple{Int64, Int64}},
+	           γ::Float64)
+	g = 0
+	n = size(M)[1]
+	x = C[c,:]
+	js_obs = .! ismissing.(M[c, :])
+	
+	for j=1:n
+		if js_obs[j]
+			y = C[j,:]
+			g = g .-((M[c,j]*(1-logistic(sum(x.*y)))-(1-M[c,j])*logistic(sum(x.*y)))).*y .+ 2*γ*same_class(c, j, compound_classes).*(x-y)
+		end
+	end
+	
+	return g
+end
+
 # ╔═╡ f8f73c2f-e332-4b16-85cf-2729780a13ad
-function grad_descent(C0,M,gamma)
+# ╠═╡ disabled = true
+#=╠═╡
+function grad_descent(C0,M,γ)
 	C = C0
 	n = size(M)[1]
 	for t=1:70
 		alpha = .01
 		for i=1:n
-			C[i,:] = C[i,:] .- alpha.*grad_loss(C,M,gamma,i) 
+			C[i,:] = C[i,:] .- alpha.*grad_loss(C,c,M,γ) 
 		end
 	end
 	return C
 end
+  ╠═╡ =#
 
 # ╔═╡ c44a5395-8143-4e33-9eff-dd7f01a1217b
-function grad_descent_step(C,M,gamma)
+function grad_descent_step(C,M,γ)
 	#C = C0
 	n = size(M)[1]
 	
 	alpha = .007
-	for i=1:n
-		C[i,:] = C[i,:] .- alpha.*grad_loss(C,M,gamma,i) 
+	for c=1:n
+		C[c,:] = C[c,:] .- alpha.*grad_loss(C,c,M,γ) 
 	end
 	
 	return C
@@ -134,56 +176,27 @@ end
 # ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
 # sample simulation
 begin
-	steps = 20
-	l1 = zeros(steps)
-	l2 = zeros(steps)
+	steps = [300 300]
+	l1 = zeros(steps[1])
+	l2 = zeros(steps[2])
 	k = 2
-	C1 = rand(Float64,(n,k))
-	C_γ0 = rand(Float64,(n,k))
-	gamma = [0 1]
+	C1 = rand(Float64,(n_compounds,k))
+	C_γ = rand(Float64,(n_compounds,k))
 	
-	for t=1:steps
-		global C1 = grad_descent_step(C1,M,gamma[1])
-		global C2 = grad_descent_step(C2,M,gamma[2])
-		l1[t] = loss(C1,M,gamma[1])
-		l2[t] = loss(C2,M,gamma[2])
+	γ = [0.0 .3]
+	
+	for t=1:steps[1]
+		global C1 = grad_descent_step(C1,M,γ[1])
+		l1[t] = loss(C1,M,γ[1])
+	end
+
+	for t=1:steps[2]
+		global C_γ = grad_descent_step(C_γ,M,γ[2])
+		l2[t] = loss(C_γ,M,γ[2])
 		#l1[t] = dot((C1*transpose(C1)),M)
 		#l2[t] = dot((C2*transpose(C2)),M)
 	end
 end
-
-# ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
-function ∇_loss(C::Matrix{Float64}, 
-	           c::Int,
-	           M::Matrix{Union{Missing, Int64}}, 
-	           ids_obs::Vector{Tuple{Int64, Int64}},
-	           γ::Float64)
-	g = 0
-	n = size(M)[1]
-	x = C[i,:]
-	for j=1:n
-		y = C[j,:]
-		if i != j
-			g = g .-((M[i,j]*(1-logistic(sum(x.*y)))-(1-M[i,j])*logistic(sum(x.*y)))).*y .+ 2*gamma*(1-M[i,j]).*(x-y)
-		end
-	end
-	
-	return g
-end
-
-# ╔═╡ 387beb1f-3e2d-4014-85d6-2e253c0a18f7
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	figure()
-	xlabel("step")
-	ylabel("loss")
-	scatter(1:steps,l1, label="No graph regularization")
-	scatter(1:steps,l2, label="graph regularization")
-	legend()
-	gcf()
-end
-  ╠═╡ =#
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -194,8 +207,89 @@ md"## viz results
 and repeat with and without graph regularization.
 "
 
+# ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
+begin
+	figure()
+	xlabel("step")
+	ylabel("loss")
+	scatter(1:steps[1],l1, label="w/o graph regularization")
+	scatter(1:steps[2],l2, label="w/ graph regularization")
+	legend()
+	gcf()
+end
+
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
-(C2*transpose(C2))
+begin
+	figure(figsize=(9, 9))
+	#fig, (ax1, ax2) = plt.subplots(1, 2)
+	scatter(C_γ[:, 1], C_γ[:, 2], edgecolor="k", c=compounds[:, :ATPS_frac], marker="s", cmap="gist_rainbow")
+
+	#scatter(C1[:, 1], C1[:, 3], edgecolor="k", c=compounds[:, :ATPS_frac], marker="s", cmap="gist_rainbow")
+
+	xlabel("latent dimension 1")
+	ylabel("latent dimension 2")
+	
+	#for (i,label) in enumerate(compounds[:, :CLASS])
+    	#PyPlot.annotate(label, (Y[1,i], Y[2,i]), fontsize=6)
+	#end
+
+	axvline(x=0.0, color="lightgray", zorder=0)
+	axhline(y=0.0, color="lightgray", zorder=0)
+	colorbar(label="ATPS (Aqueous Two-Phase System) forming fraction", fraction=0.046, pad=0.04)
+	gca().set_aspect("equal", "box")
+	tight_layout()
+	#savefig("prop_latent_space.pdf", format="pdf")
+	gcf()
+	
+end
+
+# ╔═╡ 25140d66-18cc-4f0b-a31b-1ab4816ed73e
+sk = pyimport("sklearn.metrics")
+
+# ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
+function cm(C, M_complete, ids_unobs)
+	
+	m_true = zeros(length(ids_unobs))
+	m_pred = zeros(length(ids_unobs))
+	
+	for (k,(i,j)) in enumerate(ids_unobs)
+		if abs((C*transpose(C))[i,j]) > 0.5
+			m_pred[k] = 1
+		else
+			m_pred[k] = 0
+		end
+		m_true[k] = M_complete[i,j]
+	end
+		
+	cm = sk.confusion_matrix(m_true,m_pred)
+	#return sk.ConfusionMatrixDisplay(cm).plot()
+	return cm
+end
+
+# ╔═╡ 514c2f36-8b34-4cae-b787-ec51d711fa34
+md"## confusion matrix: w/ graph regularization"
+
+# ╔═╡ b52d0cb0-6ebb-4f5d-9762-ade7bc305746
+begin
+	#fig, (ax0, ax1) = subplots(2, 1)
+	cm1=cm(C_γ, M_complete, ids_unobs)
+	fig1=sk.ConfusionMatrixDisplay(cm1).plot()
+	gcf()
+	
+	#fig = cm(C_γ, M_complete, ids_unobs)
+	
+	
+end
+
+# ╔═╡ c7cdb6a2-9544-480c-9d4f-8024e2ea5678
+md"## confusion matrix: w/o graph regularization"
+
+# ╔═╡ b20e6084-afa4-4864-b32a-57614bdde09f
+begin
+	cm2=cm(C1, M_complete, ids_unobs)
+	fig2=sk.ConfusionMatrixDisplay(cm2).plot()
+	gcf()
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -204,6 +298,7 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
@@ -213,6 +308,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 CSV = "~0.10.4"
 DataFrames = "~0.21.8"
 LogExpFunctions = "~0.3.17"
+PyCall = "~1.94.1"
 PyPlot = "~2.10.0"
 StatsBase = "~0.33.21"
 """
@@ -221,7 +317,7 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.2"
+julia_version = "1.7.3"
 manifest_format = "2.0"
 
 [[deps.ArgTools]]
@@ -332,7 +428,7 @@ uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.9.1"
 
 [[deps.Downloads]]
-deps = ["ArgTools", "LibCURL", "NetworkOptions"]
+deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 
 [[deps.FilePathsBase]]
@@ -340,6 +436,9 @@ deps = ["Compat", "Dates", "Mmap", "Printf", "Test", "UUIDs"]
 git-tree-sha1 = "129b104185df66e408edd6625d480b7f9e9823a0"
 uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
 version = "0.9.18"
+
+[[deps.FileWatching]]
+uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -485,9 +584,9 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [[deps.PyCall]]
 deps = ["Conda", "Dates", "Libdl", "LinearAlgebra", "MacroTools", "Serialization", "VersionParsing"]
-git-tree-sha1 = "1fc929f47d7c151c839c5fc1375929766fb8edcc"
+git-tree-sha1 = "53b8b07b721b77144a0fbbbc2675222ebf40a02d"
 uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-version = "1.93.1"
+version = "1.94.1"
 
 [[deps.PyPlot]]
 deps = ["Colors", "LaTeXStrings", "PyCall", "Sockets", "Test", "VersionParsing"]
@@ -631,6 +730,7 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═b9e723cf-3af9-40b7-a9de-61893c633d53
 # ╠═dc065d67-229c-4f3f-8912-45a2deb3bf5e
 # ╠═a5e6d4ac-d1c4-44d5-9ea8-a599893376de
+# ╠═964f0898-3bb8-4cc4-9fb7-8e073e09c7a5
 # ╠═b656b1bf-ab58-4831-929d-95961a7b1505
 # ╠═22531e96-f0f7-45c0-a327-53094a83ddcf
 # ╠═915c174f-dbd1-42bb-92f0-1ccf7d319258
@@ -638,6 +738,7 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
+# ╠═0aa5411e-896f-4487-93c3-9711f71bdb3a
 # ╟─eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 # ╠═5b66b823-d2c7-4e13-80e9-384e19e149e3
 # ╠═45d36237-a7d2-4833-add3-bbc95fc427e1
@@ -646,8 +747,15 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
 # ╠═38e663bb-0de3-46c4-9e72-761ea22bc9a6
-# ╠═387beb1f-3e2d-4014-85d6-2e253c0a18f7
 # ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
+# ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
+# ╠═43e0bde9-7910-46c7-a4d1-e3ec84eeb26e
+# ╠═25140d66-18cc-4f0b-a31b-1ab4816ed73e
+# ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
+# ╟─514c2f36-8b34-4cae-b787-ec51d711fa34
+# ╠═b52d0cb0-6ebb-4f5d-9762-ade7bc305746
+# ╟─c7cdb6a2-9544-480c-9d4f-8024e2ea5678
+# ╠═b20e6084-afa4-4864-b32a-57614bdde09f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
