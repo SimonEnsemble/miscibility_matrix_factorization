@@ -140,11 +140,6 @@ end
 # ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 md"## the loss function and its gradient"
 
-# ╔═╡ 9651a89f-5c32-499e-ab9f-5be6be259257
-for i = 1:5, j = i+1:5
-	println((i,j))
-end
-
 # ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
 function loss(C::Matrix{Float64}, b::Float64,
 	          M::Matrix{Union{Missing, Int64}}, 
@@ -177,28 +172,33 @@ function loss(C::Matrix{Float64}, b::Float64,
 	return mismatch_term + graph_reg_term
 end
 
-# ╔═╡ 5317b6b8-a259-44ad-9aae-183306b2259a
-loss(rand(2, n_compounds), 0.0, M, K, ids_obs, 0.1)
-
 # ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
-function grad_loss(C::Matrix{Float64}, 
-	           c::Int,
-	           M::Matrix{Union{Missing, Int64}}, 
-	           #ids_obs::Vector{Tuple{Int64, Int64}},
-	           γ::Float64)
-	g = 0
-	n = size(M)[1]
-	x = C[c,:]
-	js_obs = .! ismissing.(M[c, :])
+function ∇_cᵢ(C::Matrix{Float64}, b::Float64,
+			  i_compound::Int,
+	          M::Matrix{Union{Missing, Int64}}, 
+		      K::Matrix{Float64},
+	          ids_obs::Vector{Tuple{Int64, Int64}},
+	          γ::Float64)
+	∇ = zeros(size(C)[1])
+	n_compounds = size(M)[1]
 	
-	for j=1:n
-		if js_obs[j]
-			y = C[j,:]
-			g = g .-((M[c,j]*(1-logistic(sum(x.*y)))-(1-M[c,j])*logistic(sum(x.*y)))).*y .+ 2*γ*same_class(c, j, compound_classes).*(x-y)
+	# cross-entropy loss expressing mismatch over observations
+	for (i, j) in ids_obs
+		if i != i_compound
+			continue
 		end
+		# model prediction
+		m̂ᵢⱼ = logistic(dot(C[:, i], C[:, j]) + b)
+		# increment loss
+		∇ += C[:, i] .* (m̂ᵢⱼ - M[i, j])
 	end
 	
-	return g
+	# graph regularization term
+	for j = 1:n_compounds
+		∇ += γ * K[i_compound, j] * 2 * (C[:, i_compound] - C[:, j])
+	end
+	
+	return ∇
 end
 
 # ╔═╡ f8f73c2f-e332-4b16-85cf-2729780a13ad
@@ -1693,9 +1693,7 @@ version = "3.5.0+0"
 # ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 # ╠═c106b08f-2025-4531-90e2-ed1d4d8e8b36
 # ╟─eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
-# ╠═9651a89f-5c32-499e-ab9f-5be6be259257
 # ╠═500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-# ╠═5317b6b8-a259-44ad-9aae-183306b2259a
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
 # ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
