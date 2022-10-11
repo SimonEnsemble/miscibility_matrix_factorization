@@ -93,23 +93,33 @@ K = 1.0 * [compound_classes[i] == compound_classes[j] for i = 1:n_compounds, j =
 # ╔═╡ ee675570-94ef-4061-9438-7e60a0e5dae1
 md"## introducing missing values"
 
+# ╔═╡ d1062c18-909e-49f7-b7b8-82a566316b64
+struct MiscibilityData
+	M::Matrix{Union{Int64, Missing}}
+	n_compounds::Int
+	ids_obs::Vector{Tuple{Int, Int}}
+	ids_missing::Vector{Tuple{Int, Int}}
+	ids_all_pairs::Vector{Tuple{Int, Int}}
+	K::Matrix{Float64}
+end
+
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
 # θ:fraction of missing entries
 # important note: we only pay attn to upper triangle of matrix.
-function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
+function sim_data_collection(θ::Float64, M_complete::Matrix{Int64}, K::Matrix{Float64})
 	n_compounds = size(M_complete)[1]
 
 	# make list of entries in upper diagonal of the matrix
-	all_pairs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds]
-	@assert length(all_pairs) == (n_compounds ^ 2 - n_compounds) ÷ 2
+	ids_all_pairs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds]
+	@assert length(ids_all_pairs) == (n_compounds ^ 2 - n_compounds) ÷ 2
 
 	# number of observed entries
-	nb_observed = floor(Int, (1-θ) * length(all_pairs))
+	nb_observed = floor(Int, (1-θ) * length(ids_all_pairs))
 
 	# sample observed tuples
-    ids_obs = StatsBase.sample(all_pairs, nb_observed, replace=false)
+    ids_obs = StatsBase.sample(ids_all_pairs, nb_observed, replace=false)
 	# the rest are unobserved
-	ids_unobs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
+	ids_missing = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
 		             if !((i, j) in ids_obs)]
 	
 	# construct the matrix with missing values
@@ -121,84 +131,94 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 		M[j, i] = M_complete[i, j]
 	end
 	
-    return M, ids_obs, ids_unobs
+    return MiscibilityData(M, n_compounds, ids_obs, ids_missing, ids_all_pairs, K)
 end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-M, ids_obs, ids_unobs = sim_data_collection(0.5, M_complete)
+data = sim_data_collection(0.5, M_complete, K)
 
 # ╔═╡ 54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 md"some tests"
 
 # ╔═╡ c106b08f-2025-4531-90e2-ed1d4d8e8b36
 begin
-	@assert all(skipmissing(M') .== skipmissing(M))
-	@assert all(ismissing.([M[i, j] for (i, j) in ids_unobs]))
-	@assert all(.! ismissing.([M[i, j] for (i, j) in ids_obs]))
+	@assert all(skipmissing(data.M') .== skipmissing(data.M))
+	@assert all(ismissing.([data.M[i, j] for (i, j) in data.ids_missing]))
+	@assert all(.! ismissing.([data.M[i, j] for (i, j) in data.ids_obs]))
 end
 
 # ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 md"## the loss function and its gradient"
 
-# ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-function loss(C::Matrix{Float64}, b::Float64,
-	          M::Matrix{Union{Missing, Int64}}, 
-		      K::Matrix{Float64},
-	          ids_obs::Vector{Tuple{Int64, Int64}},
-	          γ::Float64)
-	# code below assumes M all 0's or 1's
-	@assert all(skipmissing(M) .== 1 .|| skipmissing(M) .== 0)
-	# latent vectors are columns of C
-	@assert size(C)[2] == size(M)[1] == size(M)[2]
+# ╔═╡ fabe9de6-f0e3-49fd-84b5-fe973e39f5a0
+struct Model
+	C::Matrix{Float64}
+	b::Float64
+	γ::Float64
+end
 
-	n_compounds = size(M)[1]
+# ╔═╡ af50a2c4-d8aa-49bd-b596-39964d2d8c7e
+function pred_mᵢⱼ(model::Model, i::Int, j::Int)
+	cᵢ = model.C[:, i]
+	cⱼ = model.C[:, j]
+	return logistic(dot(cᵢ, cⱼ) + model.b)
+end
+
+# ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
+function loss(data::MiscibilityData, model::Model)
+	# code below assumes M all 0's or 1's
+	@assert all(skipmissing(data.M) .== 1 .|| skipmissing(data.M) .== 0)
+	# latent vectors are columns of C
+	@assert size(model.C)[2] == size(data.M)[1] == size(data.M)[2]
 	
 	# cross-entropy loss expressing mismatch over observations
 	mismatch_term = 0.0
-	for (i, j) in ids_obs
+	for (i, j) in data.ids_obs
 		# model prediction
-		m̂ᵢⱼ = logistic(dot(C[:, i], C[:, j]) + b)
+		m̂ᵢⱼ = pred_mᵢⱼ(model, i, j)
 		# increment loss
-		mismatch_term -= (M[i, j] == 0) ? log(1 - m̂ᵢⱼ) : log(m̂ᵢⱼ)
+		mismatch_term -= (data.M[i, j] == 0) ? log(1 - m̂ᵢⱼ) : log(m̂ᵢⱼ)
 	end
 	
 	# graph regularization term
 	graph_reg_term = 0.0
-	for i = 1:n_compounds, j = i+1:n_compounds # loop over pairs
-		graph_reg_term += K[i, j] * norm(C[:, i] - C[:, j])
+	for i = 1:data.n_compounds, j = i+1:data.n_compounds # loop over pairs
+		graph_reg_term += data.K[i, j] * norm(model.C[:, i] - model.C[:, j])
 	end
-	graph_reg_term *= γ
+	graph_reg_term *= model.γ
 	
 	return mismatch_term + graph_reg_term
 end
 
 # ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
-function ∇_cᵢ(C::Matrix{Float64}, b::Float64,
-			  i_compound::Int,
-	          M::Matrix{Union{Missing, Int64}}, 
-		      K::Matrix{Float64},
-	          ids_obs::Vector{Tuple{Int64, Int64}},
-	          γ::Float64)
-	∇ = zeros(size(C)[1])
-	n_compounds = size(M)[1]
+function ∇_cᵢ(data::MiscibilityData, model::Model, i::Int)
+	∇ = zeros(size(model.C)[1])
+	n_compounds = size(data.M)[1]
 	
 	# cross-entropy loss expressing mismatch over observations
-	for (i, j) in ids_obs
-		if i != i_compound
+	for (_i, j) in data.ids_obs
+		if _i != i
 			continue
 		end
 		# model prediction
-		m̂ᵢⱼ = logistic(dot(C[:, i], C[:, j]) + b)
+		m̂ᵢⱼ = pred_mᵢⱼ(model, i, j)
 		# increment loss
-		∇ += C[:, i] .* (m̂ᵢⱼ - M[i, j])
+		∇ += model.C[:, i] .* (m̂ᵢⱼ - data.M[i, j])
 	end
 	
 	# graph regularization term
-	for j = 1:n_compounds
-		∇ += γ * K[i_compound, j] * 2 * (C[:, i_compound] - C[:, j])
+	for j = 1:data.n_compounds
+		∇ += model.γ * data.K[i, j] * 2 * (model.C[:, i] - model.C[:, j])
 	end
 	
 	return ∇
+end
+
+# ╔═╡ 2167b72b-ea6f-41c0-b940-a77a628c72fd
+begin
+	local model = Model(rand(2, data.n_compounds), 0.0, 0.1)
+	loss(data, model)
+	∇_cᵢ(data, model, 1)
 end
 
 # ╔═╡ f8f73c2f-e332-4b16-85cf-2729780a13ad
@@ -218,11 +238,15 @@ end
   ╠═╡ =#
 
 # ╔═╡ c44a5395-8143-4e33-9eff-dd7f01a1217b
-function grad_descent_step(C,M,γ)
+function grad_descent_epoch!(C::Matrix{Float64}, b::Float64,
+					         M::Matrix{Union{Missing, Int64}}, 
+						     K::Matrix{Float64},
+					         ids_obs::Vector{Tuple{Int64, Int64}},
+					         γ::Float64)
 	#C = C0
 	n = size(M)[1]
-	
-	alpha = .007
+	# learning rate
+	α = 0.007
 	for c=1:n
 		C[c,:] = C[c,:] .- alpha.*grad_loss(C,c,M,γ) 
 	end
@@ -1688,12 +1712,16 @@ version = "3.5.0+0"
 # ╠═e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
 # ╠═c05fbffb-4f53-4e44-9735-7ee8d48835a4
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
+# ╠═d1062c18-909e-49f7-b7b8-82a566316b64
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
 # ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 # ╠═c106b08f-2025-4531-90e2-ed1d4d8e8b36
 # ╟─eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
+# ╠═fabe9de6-f0e3-49fd-84b5-fe973e39f5a0
+# ╠═af50a2c4-d8aa-49bd-b596-39964d2d8c7e
 # ╠═500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
+# ╠═2167b72b-ea6f-41c0-b940-a77a628c72fd
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
 # ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
