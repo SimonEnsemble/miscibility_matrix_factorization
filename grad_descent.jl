@@ -78,8 +78,17 @@ end
 # ╔═╡ 3a6f1f39-b598-4ce2-8858-b17551133bfe
 compound_names = String.(compounds[:, "NAME"])
 
+# ╔═╡ 3153dd82-8be6-4683-b93d-9629c3d3312f
+md"## similarity matrix"
+
 # ╔═╡ d6d83535-fa87-4de9-8ddc-0920a6bad075
 compound_classes = String.(compounds[:, "CLASS"])
+
+# ╔═╡ e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
+unique(compound_classes)
+
+# ╔═╡ c05fbffb-4f53-4e44-9735-7ee8d48835a4
+K = 1.0 * [compound_classes[i] == compound_classes[j] for i = 1:n_compounds, j = 1:n_compounds]
 
 # ╔═╡ ee675570-94ef-4061-9438-7e60a0e5dae1
 md"## introducing missing values"
@@ -91,14 +100,14 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 	n_compounds = size(M_complete)[1]
 
 	# make list of entries in upper diagonal of the matrix
-	all_entries = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds]
-	@assert length(all_entries) == (n_compounds ^ 2 - n_compounds) ÷ 2
+	all_pairs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds]
+	@assert length(all_pairs) == (n_compounds ^ 2 - n_compounds) ÷ 2
 
 	# number of observed entries
-	nb_observed = floor(Int, (1-θ) * length(all_entries))
+	nb_observed = floor(Int, (1-θ) * length(all_pairs))
 
 	# sample observed tuples
-    ids_obs = StatsBase.sample(all_entries, nb_observed, replace=false)
+    ids_obs = StatsBase.sample(all_pairs, nb_observed, replace=false)
 	# the rest are unobserved
 	ids_unobs = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
 		             if !((i, j) in ids_obs)]
@@ -112,50 +121,64 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 		M[j, i] = M_complete[i, j]
 	end
 	
-    return M, ids_obs, ids_unobs, all_entries
+    return M, ids_obs, ids_unobs
 end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-M, ids_obs, ids_unobs, all_entries = sim_data_collection(0.5, M_complete)
+M, ids_obs, ids_unobs = sim_data_collection(0.5, M_complete)
 
-# ╔═╡ 0aa5411e-896f-4487-93c3-9711f71bdb3a
-ids_obs
+# ╔═╡ 54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
+md"some tests"
+
+# ╔═╡ c106b08f-2025-4531-90e2-ed1d4d8e8b36
+begin
+	@assert all(skipmissing(M') .== skipmissing(M))
+	@assert all(ismissing.([M[i, j] for (i, j) in ids_unobs]))
+	@assert all(.! ismissing.([M[i, j] for (i, j) in ids_obs]))
+end
 
 # ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
 md"## the loss function and its gradient"
 
-# ╔═╡ 5b66b823-d2c7-4e13-80e9-384e19e149e3
-# indicator function
-function same_class(i::Int, j::Int, compound_classes::Vector{String})
-	return compound_classes[i] == compound_classes[j]
+# ╔═╡ 9651a89f-5c32-499e-ab9f-5be6be259257
+for i = 1:5, j = i+1:5
+	println((i,j))
 end
-
-# ╔═╡ 45d36237-a7d2-4833-add3-bbc95fc427e1
-same_class(1, 1, compound_classes)
 
 # ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-function loss(C::Matrix{Float64}, 
+function loss(C::Matrix{Float64}, b::Float64,
 	          M::Matrix{Union{Missing, Int64}}, 
-	          # ids_obs::Vector{Tuple{Int64, Int64}},
+		      K::Matrix{Float64},
+	          ids_obs::Vector{Tuple{Int64, Int64}},
 	          γ::Float64)
-	l = 0.0
-	n_compounds = size(M)[1]
+	# code below assumes M all 0's or 1's
+	@assert all(skipmissing(M) .== 1 .|| skipmissing(M) .== 0)
+	# latent vectors are columns of C
+	@assert size(C)[2] == size(M)[1] == size(M)[2]
 
-	# loop over observed data
-	# loop over all pairs
-	for c = 1:n_compounds
-		js_obs = .! ismissing.(M[c, :])
-		x = C[c,:]
-		for j=1:n_compounds
-			y = C[j,:]
-			if js_obs[j]
-				l +=  -(M[c,j]*log(logistic(sum(x.*y)))+(1-M[c,j])*log(1-logistic(sum(x.*y)))) + γ*same_class(c, j, compound_classes)*sum((x-y).*transpose(x-y))
-			end
-		end
+	n_compounds = size(M)[1]
+	
+	# cross-entropy loss expressing mismatch over observations
+	mismatch_term = 0.0
+	for (i, j) in ids_obs
+		# model prediction
+		m̂ᵢⱼ = logistic(dot(C[:, i], C[:, j]) + b)
+		# increment loss
+		mismatch_term -= (M[i, j] == 0) ? log(1 - m̂ᵢⱼ) : log(m̂ᵢⱼ)
 	end
 	
-	return l
+	# graph regularization term
+	graph_reg_term = 0.0
+	for i = 1:n_compounds, j = i+1:n_compounds # loop over pairs
+		graph_reg_term += K[i, j] * norm(C[:, i] - C[:, j])
+	end
+	graph_reg_term *= γ
+	
+	return mismatch_term + graph_reg_term
 end
+
+# ╔═╡ 5317b6b8-a259-44ad-9aae-183306b2259a
+loss(rand(2, n_compounds), 0.0, M, K, ids_obs, 0.1)
 
 # ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
 function grad_loss(C::Matrix{Float64}, 
@@ -1660,15 +1683,19 @@ version = "3.5.0+0"
 # ╠═22531e96-f0f7-45c0-a327-53094a83ddcf
 # ╠═9b0388ac-a640-4ffa-8531-b1ae7b68393f
 # ╠═3a6f1f39-b598-4ce2-8858-b17551133bfe
+# ╟─3153dd82-8be6-4683-b93d-9629c3d3312f
 # ╠═d6d83535-fa87-4de9-8ddc-0920a6bad075
+# ╠═e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
+# ╠═c05fbffb-4f53-4e44-9735-7ee8d48835a4
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-# ╠═0aa5411e-896f-4487-93c3-9711f71bdb3a
+# ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
+# ╠═c106b08f-2025-4531-90e2-ed1d4d8e8b36
 # ╟─eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
-# ╠═5b66b823-d2c7-4e13-80e9-384e19e149e3
-# ╠═45d36237-a7d2-4833-add3-bbc95fc427e1
+# ╠═9651a89f-5c32-499e-ab9f-5be6be259257
 # ╠═500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
+# ╠═5317b6b8-a259-44ad-9aae-183306b2259a
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
 # ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
