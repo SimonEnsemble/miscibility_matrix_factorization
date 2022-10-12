@@ -164,7 +164,8 @@ md"## the loss function and its gradient"
 mutable struct Model
 	C::Matrix{Float64}
 	b::Float64
-	γ::Float64 # regularization param
+	γ::Float64 # regularization param for graph structure
+	λ::Float64 # regularization param on latent reps
 end
 
 # ╔═╡ af50a2c4-d8aa-49bd-b596-39964d2d8c7e
@@ -184,6 +185,7 @@ function loss(data::MiscibilityData, model::Model)
 	# cross-entropy loss expressing mismatch over observations
 	l = 0.0
 	for i = 1:data.n_compounds
+		l += model.λ * norm(model.C[:, i])
 		for j = (i+1):data.n_compounds
 			###
 			#    graph-regularization term
@@ -216,12 +218,13 @@ end
 function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int)
 	∇ = zeros(size(model.C)[1])
 	
+	∇ += model.λ * 2 * model.C[:, c] # regularize latent rep.
 	# cross-entropy loss expressing mismatch over observations
 	for j = 1:data.n_compounds
 		###
 		#   contribution to gradient by reg. term
 		###
-		∇ += model.γ * data.K[c, j] * 2 * (model.C[:, c] - model.C[:, j])
+		∇ += model.γ * data.K[c, j] * 2 * (model.C[:, c] - model.C[:, j]) # graph
 
 		###
 		#   contribution to gradient by mis-matches
@@ -272,7 +275,7 @@ function grad_descent_epoch!(data::MiscibilityData, model::Model; α::Float64=0.
 end
 
 # ╔═╡ 8482b062-fae4-428a-92ec-12e8e5b6954e
-model_test = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.1)
+model_test = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.1, 0.0)
 
 # ╔═╡ 7a97eb4a-6d5a-4fc2-ad9c-49d8a7c281ea
 loss(data, model_test)
@@ -294,11 +297,11 @@ md"## training time"
 
 # ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
 begin
-	nb_epochs = 200
+	nb_epochs = 5000
 	losses = [NaN for _ = 1:nb_epochs]
 	losses_γ0 = [NaN for _ = 1:nb_epochs]
-	model = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.0)
-	model_γ0 = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.1)
+	model = Model(0.5 * randn(2, data.n_compounds), 0.0, 0.1, 0.1)
+	model_γ0 = Model(0.5 * randn(2, data.n_compounds), 0.0, 0.0, 0.1)
 
 	for s = 1:nb_epochs
 		grad_descent_epoch!(data, model, α=0.001)
@@ -309,6 +312,9 @@ begin
 	end
 	losses
 end
+
+# ╔═╡ 35b251bc-f26c-4923-8e26-07f4384b1a98
+model.b
 
 # ╔═╡ ecc4032c-6b3c-42b1-b0c9-1c4b73d6a0a2
 logistic(model.b)
@@ -372,55 +378,45 @@ end
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
 viz_latent_space(model)
 
-# ╔═╡ cbec3851-15e7-40f0-911f-19042db8aedc
-
+# ╔═╡ 690f38c0-4c89-4ba6-b372-2618b3d1cb68
+viz_latent_space(model_γ0)
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
-function cm(C, M_complete, ids_unobs,b,t)
+function viz_confusion(model::Model, data::MiscibilityData)
 	
-	m_true = zeros(length(ids_unobs))
-	m_pred = zeros(length(ids_unobs))
-	
-	for (k,(i,j)) in enumerate(ids_unobs)
-		if abs((C*transpose(C))[i,j]-b) > t
-			m_pred[k] = 1
-		else
-			m_pred[k] = 0
-		end
-		m_true[k] = M_complete[i,j]
-	end
-		
-	cm = sk.confusion_matrix(m_true,m_pred)
-	#return sk.ConfusionMatrixDisplay(cm).plot()
-	return cm
+	m = [M_complete[i, j]            for (i, j) in data.ids_missing]
+	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
+
+	cm = confusion_matrix(m, m̂)
+
+	fig = Figure()
+	ax  = Axis(fig[1, 1], 
+		xlabel="prediction", ylabel="truth",
+		xticks=(1:2, ["immiscible", "miscible"]),
+		yticks=(1:2, reverse(["immiscible", "miscible"]))
+	)
+	# TODO this is messed up.
+	hm = heatmap!(reverse(cm', dims=2), 
+		colormap=ColorSchemes.algae, 
+		colorrange=(0, maximum(cm))
+	)
+	for i = 1:2
+        for j = 1:2
+            text!("$(Int(round(cm[j, i], digits=1)))",
+                  position=(i, j), align=(:center, :center), color="white", 
+				  textsize=50
+			)
+        end
+    end
+    Colorbar(fig[1, 2], hm, label="# pairs")
+	return fig
 end
 
-# ╔═╡ 514c2f36-8b34-4cae-b787-ec51d711fa34
-md"## confusion matrix: w/ graph regularization"
+# ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
+viz_confusion(model, data)
 
-# ╔═╡ b52d0cb0-6ebb-4f5d-9762-ade7bc305746
-begin
-	#fig, (ax0, ax1) = subplots(2, 1)
-	b = 0.3
-	t = 0.5
-	cm1=cm(C_γ, M_complete, ids_unobs,b,t)
-	fig1=sk.ConfusionMatrixDisplay(cm1).plot()
-	gcf()
-	
-	#fig = cm(C_γ, M_complete, ids_unobs)
-	
-	
-end
-
-# ╔═╡ c7cdb6a2-9544-480c-9d4f-8024e2ea5678
-md"## confusion matrix: w/o graph regularization"
-
-# ╔═╡ b20e6084-afa4-4864-b32a-57614bdde09f
-begin
-	cm2=cm(C1, M_complete, ids_unobs,b ,t)
-	fig2=sk.ConfusionMatrixDisplay(cm2).plot()
-	gcf()
-end
+# ╔═╡ 257e6d42-28c4-4a93-b6e7-1cd297bea24b
+viz_confusion(model_γ0, data)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -454,7 +450,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "b0ccfa9b829f4ef19e4410b2f3e6f9c83924cb22"
+project_hash = "22ebafd5f0cdb3b7b1f8339e8779ff98c8fa6a4b"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1818,6 +1814,7 @@ version = "3.5.0+0"
 # ╠═dd3e7d15-d3bd-447c-a050-f1833ae8af97
 # ╟─a87cc2ef-b91f-49a2-9fbe-cef50192976d
 # ╠═38e663bb-0de3-46c4-9e72-761ea22bc9a6
+# ╠═35b251bc-f26c-4923-8e26-07f4384b1a98
 # ╠═ecc4032c-6b3c-42b1-b0c9-1c4b73d6a0a2
 # ╠═422ac24b-bf1b-4d8f-88a6-c49f1b999982
 # ╠═e6bf1215-2b79-488c-b1f4-e149ca97e273
@@ -1827,12 +1824,9 @@ version = "3.5.0+0"
 # ╠═a120c609-f5cb-4012-9f7c-e3702269b541
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═b93b5880-3a89-4028-a2dc-b93d5c6b138d
-# ╠═880d2fc7-afc7-430d-8b8a-87b0603f92a0
-# ╠═cbec3851-15e7-40f0-911f-19042db8aedc
+# ╠═690f38c0-4c89-4ba6-b372-2618b3d1cb68
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
-# ╟─514c2f36-8b34-4cae-b787-ec51d711fa34
-# ╠═b52d0cb0-6ebb-4f5d-9762-ade7bc305746
-# ╟─c7cdb6a2-9544-480c-9d4f-8024e2ea5678
-# ╠═b20e6084-afa4-4864-b32a-57614bdde09f
+# ╠═35666424-d5dc-4a2f-a650-3241a0952c07
+# ╠═257e6d42-28c4-4a93-b6e7-1cd297bea24b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
