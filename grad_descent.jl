@@ -106,7 +106,9 @@ end
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
 # θ:fraction of missing entries
 # important note: we only pay attn to upper triangle of matrix.
-function sim_data_collection(θ::Float64, M_complete::Matrix{Int64}, K::Matrix{Float64})
+function sim_data_collection(θ::Float64, 
+	                         M_complete::Matrix{Int64}, 
+	                         K::Matrix{Float64})
 	n_compounds = size(M_complete)[1]
 
 	# make list of entries in upper diagonal of the matrix
@@ -151,7 +153,7 @@ end
 md"## the loss function and its gradient"
 
 # ╔═╡ fabe9de6-f0e3-49fd-84b5-fe973e39f5a0
-struct Model
+mutable struct Model
 	C::Matrix{Float64}
 	b::Float64
 	γ::Float64
@@ -193,7 +195,6 @@ end
 # ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
 function ∇_cᵢ(data::MiscibilityData, model::Model, i::Int)
 	∇ = zeros(size(model.C)[1])
-	n_compounds = size(data.M)[1]
 	
 	# cross-entropy loss expressing mismatch over observations
 	for (_i, j) in data.ids_obs
@@ -214,69 +215,70 @@ function ∇_cᵢ(data::MiscibilityData, model::Model, i::Int)
 	return ∇
 end
 
-# ╔═╡ 2167b72b-ea6f-41c0-b940-a77a628c72fd
-begin
-	local model = Model(rand(2, data.n_compounds), 0.0, 0.1)
-	loss(data, model)
-	∇_cᵢ(data, model, 1)
-end
-
-# ╔═╡ f8f73c2f-e332-4b16-85cf-2729780a13ad
-# ╠═╡ disabled = true
-#=╠═╡
-function grad_descent(C0,M,γ)
-	C = C0
-	n = size(M)[1]
-	for t=1:70
-		alpha = .01
-		for i=1:n
-			C[i,:] = C[i,:] .- alpha.*grad_loss(C,c,M,γ) 
-		end
+# ╔═╡ 81f11413-bc17-4d38-880b-1afbca4ee01d
+function ∇_b(data::MiscibilityData, model::Model)
+	∇ = 0.0
+	
+	for (i, j) in data.ids_obs
+		# model prediction
+		m̂ᵢⱼ = pred_mᵢⱼ(model, i, j)
+		# increment loss
+		∇ += m̂ᵢⱼ - data.M[i, j]
 	end
-	return C
+	return ∇
 end
-  ╠═╡ =#
 
 # ╔═╡ c44a5395-8143-4e33-9eff-dd7f01a1217b
-function grad_descent_epoch!(C::Matrix{Float64}, b::Float64,
-					         M::Matrix{Union{Missing, Int64}}, 
-						     K::Matrix{Float64},
-					         ids_obs::Vector{Tuple{Int64, Int64}},
-					         γ::Float64)
-	#C = C0
-	n = size(M)[1]
-	# learning rate
-	α = 0.007
-	for c=1:n
-		C[c,:] = C[c,:] .- alpha.*grad_loss(C,c,M,γ) 
+function grad_descent_epoch!(data::MiscibilityData, model::Model; α::Float64=0.01)
+	# update compound vectors
+	for c = shuffle(1:data.n_compounds)
+		model.C[:, c] -= α * ∇_cᵢ(data, model, c)
 	end
-	
-	return C
+	# update bias
+	model.b -= α * ∇_b(data, model)
+	return nothing
 end
 
-# ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
-# sample simulation
-begin
-	steps = [300 300]
-	l1 = zeros(steps[1])
-	l2 = zeros(steps[2])
-	k = 2
-	C1 = rand(Float64,(n_compounds,k))
-	C_γ = rand(Float64,(n_compounds,k))
-	
-	γ = [0.0 .3]
-	
-	for t=1:steps[1]
-		global C1 = grad_descent_step(C1,M,γ[1])
-		l1[t] = loss(C1,M,γ[1])
-	end
+# ╔═╡ 8482b062-fae4-428a-92ec-12e8e5b6954e
+model_test = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.1)
 
-	for t=1:steps[2]
-		global C_γ = grad_descent_step(C_γ,M,γ[2])
-		l2[t] = loss(C_γ,M,γ[2])
-		#l1[t] = dot((C1*transpose(C1)),M)
-		#l2[t] = dot((C2*transpose(C2)),M)
+# ╔═╡ 7a97eb4a-6d5a-4fc2-ad9c-49d8a7c281ea
+loss(data, model_test)
+
+# ╔═╡ dd8aac5c-e757-4386-8439-cdd92b7f9cdc
+∇_cᵢ(data, model_test, 1)
+
+# ╔═╡ dbc44bdc-0bdf-4183-9106-01d1ee2259e2
+∇_b(data, model_test)
+
+# ╔═╡ 0107919f-cf0f-4b4f-aca6-0170faeb2f6e
+grad_descent_epoch!(data, model_test)
+
+# ╔═╡ dd3e7d15-d3bd-447c-a050-f1833ae8af97
+model_test
+
+# ╔═╡ a87cc2ef-b91f-49a2-9fbe-cef50192976d
+md"## training time"
+
+# ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
+begin
+	nb_epochs = 100
+	losses = [NaN for _ = 1:nb_epochs]
+	model = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.0)
+
+	for s = 1:nb_epochs
+		grad_descent_epoch!(data, model, α=0.001)
+		losses[s] = loss(data, model)
 	end
+	losses
+end
+
+# ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
+begin
+	local fig = Figure()
+	local ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
+	lines!(1:nb_epochs, losses)
+	fig
 end
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
@@ -287,17 +289,6 @@ md"## viz results
 
 and repeat with and without graph regularization.
 "
-
-# ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
-begin
-	figure()
-	xlabel("step")
-	ylabel("loss")
-	scatter(1:steps[1],l1, label="w/o graph regularization")
-	scatter(1:steps[2],l2, label="w/ graph regularization")
-	legend()
-	gcf()
-end
 
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 begin
@@ -414,7 +405,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.0"
 manifest_format = "2.0"
-project_hash = "32ff82a4a034f31147174cca2762a07d3d28b90b"
+project_hash = "7a3c150f1aba56a2f0380127a0d579ab7fd40aeb"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1721,13 +1712,19 @@ version = "3.5.0+0"
 # ╠═fabe9de6-f0e3-49fd-84b5-fe973e39f5a0
 # ╠═af50a2c4-d8aa-49bd-b596-39964d2d8c7e
 # ╠═500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-# ╠═2167b72b-ea6f-41c0-b940-a77a628c72fd
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
-# ╠═f8f73c2f-e332-4b16-85cf-2729780a13ad
+# ╠═81f11413-bc17-4d38-880b-1afbca4ee01d
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
+# ╠═8482b062-fae4-428a-92ec-12e8e5b6954e
+# ╠═7a97eb4a-6d5a-4fc2-ad9c-49d8a7c281ea
+# ╠═dd8aac5c-e757-4386-8439-cdd92b7f9cdc
+# ╠═dbc44bdc-0bdf-4183-9106-01d1ee2259e2
+# ╠═0107919f-cf0f-4b4f-aca6-0170faeb2f6e
+# ╠═dd3e7d15-d3bd-447c-a050-f1833ae8af97
+# ╟─a87cc2ef-b91f-49a2-9fbe-cef50192976d
 # ╠═38e663bb-0de3-46c4-9e72-761ea22bc9a6
-# ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
+# ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═43e0bde9-7910-46c7-a4d1-e3ec84eeb26e
 # ╠═25140d66-18cc-4f0b-a31b-1ab4816ed73e
