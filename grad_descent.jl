@@ -381,13 +381,21 @@ viz_latent_space(model)
 # ╔═╡ 690f38c0-4c89-4ba6-b372-2618b3d1cb68
 viz_latent_space(model_γ0)
 
-# ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
-function viz_confusion(model::Model, data::MiscibilityData)
+# ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
+begin
+	function compute_cm(model::Model, data::MiscibilityData)
+		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
+		m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
 	
-	m = [M_complete[i, j]            for (i, j) in data.ids_missing]
-	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
+		cm = confusion_matrix(m, m̂)
+	end
 
-	cm = confusion_matrix(m, m̂)
+	cm = compute_cm(model, data)
+end
+
+# ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
+function viz_confusion(cm::Matrix)
+	cm_to_plot = reverse(cm, dims=1)'
 
 	fig = Figure()
 	ax  = Axis(fig[1, 1], 
@@ -396,13 +404,13 @@ function viz_confusion(model::Model, data::MiscibilityData)
 		yticks=(1:2, reverse(["immiscible", "miscible"]))
 	)
 	# TODO this is messed up.
-	hm = heatmap!(reverse(cm', dims=2), 
+	hm = heatmap!(cm_to_plot, 
 		colormap=ColorSchemes.algae, 
 		colorrange=(0, maximum(cm))
 	)
 	for i = 1:2
         for j = 1:2
-            text!("$(Int(round(cm[j, i], digits=1)))",
+            text!("$(Int(cm_to_plot[i, j]))",
                   position=(i, j), align=(:center, :center), color="white", 
 				  textsize=50
 			)
@@ -413,10 +421,19 @@ function viz_confusion(model::Model, data::MiscibilityData)
 end
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
-viz_confusion(model, data)
+viz_confusion(cm)
 
-# ╔═╡ 257e6d42-28c4-4a93-b6e7-1cd297bea24b
-viz_confusion(model_γ0, data)
+# ╔═╡ f01cbe38-4c58-44c9-a5c3-56db0912d39b
+cm
+
+# ╔═╡ 39732eda-3d69-48de-a25a-7eb8d6077df7
+sum(cm, dims=2)
+
+# ╔═╡ 6245b563-c37d-4df8-bd01-336af78f799c
+sum([M_complete[i, j] for (i, j) in data.ids_missing] .== 0)
+
+# ╔═╡ 91bd69f6-bcb1-4e35-bab3-0bdf1300d47e
+sum([M_complete[i, j] for (i, j) in data.ids_missing] .== 1)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -450,7 +467,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "22ebafd5f0cdb3b7b1f8339e8779ff98c8fa6a4b"
+project_hash = "b0ccfa9b829f4ef19e4410b2f3e6f9c83924cb22"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1277,9 +1294,9 @@ version = "0.12.3"
 
 [[deps.Parsers]]
 deps = ["Dates"]
-git-tree-sha1 = "595c0b811cf2bab8b0849a70d9bd6379cc1cfb52"
+git-tree-sha1 = "6c01a9b494f6d2a9fc180a08b182fcb06f0958a0"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.4.1"
+version = "2.4.2"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1825,8 +1842,12 @@ version = "3.5.0+0"
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═b93b5880-3a89-4028-a2dc-b93d5c6b138d
 # ╠═690f38c0-4c89-4ba6-b372-2618b3d1cb68
+# ╠═80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
 # ╠═35666424-d5dc-4a2f-a650-3241a0952c07
-# ╠═257e6d42-28c4-4a93-b6e7-1cd297bea24b
+# ╠═f01cbe38-4c58-44c9-a5c3-56db0912d39b
+# ╠═39732eda-3d69-48de-a25a-7eb8d6077df7
+# ╠═6245b563-c37d-4df8-bd01-336af78f799c
+# ╠═91bd69f6-bcb1-4e35-bab3-0bdf1300d47e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
