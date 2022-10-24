@@ -138,6 +138,7 @@ struct MiscibilityData
 	M::Matrix{Union{Int64, Missing}}
 	n_compounds::Int
 	K::Matrix{Float64}
+	ids_obs::Vector{Tuple{Int, Int}}
 	ids_missing::Vector{Tuple{Int, Int}}
 end
 
@@ -176,7 +177,7 @@ function sim_data_collection(θ::Float64,
 		M[i, i] = 1
 	end
 	
-    return MiscibilityData(M, n_compounds, K, ids_missing)
+    return MiscibilityData(M, n_compounds, K, ids_obs, ids_missing)
 end
 
 # ╔═╡ 9ff3611e-1298-4dfe-a3d4-a85d48dc0599
@@ -333,16 +334,16 @@ function fraction_miscible(M::Union{Matrix{Int}, Matrix{Union{Missing, Int}}})
 end
 
 # ╔═╡ 52deabd5-bc18-4659-a7e5-9f42b1e5f591
-function construct_train_model(model_params::NamedTuple, 
+function construct_train_model(hyperparams::NamedTuple, 
 	                           data::MiscibilityData, 
 	                           nb_epochs::Int; α::Float64=0.001)
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
-	model = Model(0.5 * randn(model_params.k, data.n_compounds), # C
+	model = Model(0.5 * randn(hyperparams.k, data.n_compounds), # C
 		b_guess, # b
-		model_params.γ,
-		model_params.λ)
+		hyperparams.γ,
+		hyperparams.λ)
 
 	# gradient descent epochs. keep track of loss.
 	losses = [NaN for _ = 1:nb_epochs]
@@ -354,10 +355,10 @@ function construct_train_model(model_params::NamedTuple,
 end
 
 # ╔═╡ 8db228a7-bf2b-4f1e-ab7e-596b2957498f
-model_params = (k=2, γ=0.01, λ=0.01)
+hyperparams = (k=2, γ=0.01, λ=0.01)
 
 # ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
-model, losses = construct_train_model(model_params, data, 1000, α=0.005)
+model, losses = construct_train_model(hyperparams, data, 1000, α=0.005)
 
 # ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 function viz_loss(losses::Vector{Float64})
@@ -369,6 +370,26 @@ end
 
 # ╔═╡ 0ede5258-7b6a-4975-8d6b-65639bb7ac74
 viz_loss(losses)
+
+# ╔═╡ c939cb70-858d-4b57-977a-693097c78499
+md"## hyperparam optimization"
+
+# ╔═╡ 0ffb60cf-3456-4546-9676-c5d33fea7377
+data
+
+# ╔═╡ 26152770-6849-47be-bbf2-1456afa4ebfd
+begin
+	nfolds = 5
+	ms_obs = [data.M[i, j] for (i, j) in data.ids_obs]
+	# indices of ids obs.
+	kf = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
+		                  1:length(data.ids_obs), ms_obs)
+	
+	hyperparam_list = [(k=rand([2, 3]), γ=rand(), λ=rand()) for _ = 1:10]
+
+	for (k, (ids_train, ids_test)) in enumerate(kf)
+	end
+end
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -1956,6 +1977,9 @@ version = "3.5.0+0"
 # ╠═ba7a3de9-b37f-4c67-869b-fceb7915ffab
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
+# ╟─c939cb70-858d-4b57-977a-693097c78499
+# ╠═0ffb60cf-3456-4546-9676-c5d33fea7377
+# ╠═26152770-6849-47be-bbf2-1456afa4ebfd
 # ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 # ╠═a120c609-f5cb-4012-9f7c-e3702269b541
