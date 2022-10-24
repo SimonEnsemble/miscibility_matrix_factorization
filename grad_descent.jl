@@ -270,10 +270,12 @@ function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int)
 	# cross-entropy loss expressing mismatch over observations
 	for j = 1:data.n_compounds
 		###
-		#   contribution to gradient by reg. term
+		#   contribution to gradient by reg. term 
 		###
-		∇ += model.γ * data.K[c, j] * 2 * (model.C[:, c] - model.C[:, j]) # graph
-
+		if c != j
+			∇ += model.γ * data.K[c, j] * 2 * (model.C[:, c] - model.C[:, j]) # graph
+		end
+		
 		###
 		#   contribution to gradient by mis-matches
 		###
@@ -322,77 +324,51 @@ function grad_descent_epoch!(data::MiscibilityData, model::Model; α::Float64=0.
 	return nothing
 end
 
-# ╔═╡ 8482b062-fae4-428a-92ec-12e8e5b6954e
-model_test = Model(0.05 * randn(2, data.n_compounds), 0.0, 0.1, 0.0)
-
-# ╔═╡ 7a97eb4a-6d5a-4fc2-ad9c-49d8a7c281ea
-loss(data, model_test)
-
-# ╔═╡ dd8aac5c-e757-4386-8439-cdd92b7f9cdc
-∇_cᵢ(data, model_test, 3)
-
-# ╔═╡ dbc44bdc-0bdf-4183-9106-01d1ee2259e2
-∇_b(data, model_test)
-
-# ╔═╡ 0107919f-cf0f-4b4f-aca6-0170faeb2f6e
-grad_descent_epoch!(data, model_test)
-
-# ╔═╡ dd3e7d15-d3bd-447c-a050-f1833ae8af97
-model_test
-
 # ╔═╡ a87cc2ef-b91f-49a2-9fbe-cef50192976d
-md"## training time"
+md"## training"
 
-# ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	nb_epochs = 5000
-	losses = [NaN for _ = 1:nb_epochs]
-	losses_γ0 = [NaN for _ = 1:nb_epochs]
-	model = Model(0.5 * randn(2, data.n_compounds), 0.0, 0.1, 1.5)
-	model_γ0 = Model(0.5 * randn(2, data.n_compounds), 0.0, 0.0, 1.5)
-
-	for s = 1:nb_epochs
-		grad_descent_epoch!(data, model, α=0.001)
-		losses[s] = loss(data, model)
-		
-		grad_descent_epoch!(data, model_γ0, α=0.001)
-		losses_γ0[s] = loss(data, model_γ0)
-	end
-	losses
+# ╔═╡ 8b9046d8-8a0b-4f4a-b461-8c20349ecd30
+function fraction_miscible(M::Union{Matrix{Int}, Matrix{Union{Missing, Int}}})
+	return sum(skipmissing(M) .== 1) / sum(.! ismissing.(M))
 end
-  ╠═╡ =#
 
-# ╔═╡ 35b251bc-f26c-4923-8e26-07f4384b1a98
-#=╠═╡
-model.b
-  ╠═╡ =#
+# ╔═╡ 52deabd5-bc18-4659-a7e5-9f42b1e5f591
+function construct_train_model(model_params::NamedTuple, 
+	                           data::MiscibilityData, 
+	                           nb_epochs::Int; α::Float64=0.001)
+	# initialize model
+	f_miscible = fraction_miscible(data.M)
+	b_guess = log(f_miscible / (1 - f_miscible))
+	model = Model(0.5 * randn(model_params.k, data.n_compounds), # C
+		b_guess, # b
+		model_params.γ,
+		model_params.λ)
 
-# ╔═╡ ecc4032c-6b3c-42b1-b0c9-1c4b73d6a0a2
-#=╠═╡
-logistic(model.b)
-  ╠═╡ =#
+	# gradient descent epochs. keep track of loss.
+	losses = [NaN for _ = 1:nb_epochs]
+	for s = 1:nb_epochs
+		grad_descent_epoch!(data, model, α=α)
+		losses[s] = loss(data, model)
+	end
+	return model, losses
+end
 
-# ╔═╡ 422ac24b-bf1b-4d8f-88a6-c49f1b999982
-#=╠═╡
-logistic(model_γ0.b)
-  ╠═╡ =#
+# ╔═╡ 8db228a7-bf2b-4f1e-ab7e-596b2957498f
+model_params = (k=2, γ=0.01, λ=0.01)
 
-# ╔═╡ e6bf1215-2b79-488c-b1f4-e149ca97e273
-mean(M_complete)
+# ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
+model, losses = construct_train_model(model_params, data, 1000, α=0.005)
 
 # ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
-#=╠═╡
-begin
-	local fig = Figure()
-	local ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
-	lines!(1:nb_epochs, losses, label="with regularization")
-	lines!(1:nb_epochs, losses_γ0, label="without regularization")
-	axislegend()
-	fig
+function viz_loss(losses::Vector{Float64})
+	fig = Figure()
+	ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
+	lines!(1:length(losses), losses)
+	return fig
 end
-  ╠═╡ =#
+
+# ╔═╡ 0ede5258-7b6a-4975-8d6b-65639bb7ac74
+viz_loss(losses)
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -435,17 +411,12 @@ function viz_latent_space(model::Model)
 end
 
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
-#=╠═╡
 viz_latent_space(model)
-  ╠═╡ =#
 
 # ╔═╡ 690f38c0-4c89-4ba6-b372-2618b3d1cb68
-#=╠═╡
 viz_latent_space(model_γ0)
-  ╠═╡ =#
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
-#=╠═╡
 begin
 	function compute_cm(model::Model, data::MiscibilityData)
 		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
@@ -456,7 +427,6 @@ begin
 
 	cm = compute_cm(model, data)
 end
-  ╠═╡ =#
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
@@ -486,19 +456,13 @@ function viz_confusion(cm::Matrix)
 end
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
-#=╠═╡
 viz_confusion(cm) # TODO compare to random guessing
-  ╠═╡ =#
 
 # ╔═╡ f01cbe38-4c58-44c9-a5c3-56db0912d39b
-#=╠═╡
 cm
-  ╠═╡ =#
 
 # ╔═╡ 39732eda-3d69-48de-a25a-7eb8d6077df7
-#=╠═╡
 sum(cm, dims=2)
-  ╠═╡ =#
 
 # ╔═╡ 6245b563-c37d-4df8-bd01-336af78f799c
 sum([M_complete[i, j] for (i, j) in data.ids_missing] .== 0)
@@ -1985,19 +1949,13 @@ version = "3.5.0+0"
 # ╠═4758b6e9-3c01-42b4-85bf-30ac2298e511
 # ╠═81f11413-bc17-4d38-880b-1afbca4ee01d
 # ╠═c44a5395-8143-4e33-9eff-dd7f01a1217b
-# ╠═8482b062-fae4-428a-92ec-12e8e5b6954e
-# ╠═7a97eb4a-6d5a-4fc2-ad9c-49d8a7c281ea
-# ╠═dd8aac5c-e757-4386-8439-cdd92b7f9cdc
-# ╠═dbc44bdc-0bdf-4183-9106-01d1ee2259e2
-# ╠═0107919f-cf0f-4b4f-aca6-0170faeb2f6e
-# ╠═dd3e7d15-d3bd-447c-a050-f1833ae8af97
 # ╟─a87cc2ef-b91f-49a2-9fbe-cef50192976d
-# ╠═38e663bb-0de3-46c4-9e72-761ea22bc9a6
-# ╠═35b251bc-f26c-4923-8e26-07f4384b1a98
-# ╠═ecc4032c-6b3c-42b1-b0c9-1c4b73d6a0a2
-# ╠═422ac24b-bf1b-4d8f-88a6-c49f1b999982
-# ╠═e6bf1215-2b79-488c-b1f4-e149ca97e273
+# ╠═8b9046d8-8a0b-4f4a-b461-8c20349ecd30
+# ╠═52deabd5-bc18-4659-a7e5-9f42b1e5f591
+# ╠═8db228a7-bf2b-4f1e-ab7e-596b2957498f
+# ╠═ba7a3de9-b37f-4c67-869b-fceb7915ffab
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
+# ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
 # ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 # ╠═a120c609-f5cb-4012-9f7c-e3702269b541
