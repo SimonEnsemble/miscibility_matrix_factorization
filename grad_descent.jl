@@ -54,6 +54,7 @@ begin
 	@assert M_complete[2, 1] == M_complete[4, 1] == M_complete[13, 3] == 1
 	# immiscible entries
 	@assert M_complete[4, 3] == M_complete[13, 4] == M_complete[12, 3] == M_complete[15, 1] == 0
+	@assert all(diag(M_complete) .== 1) # all compounds miscible with themselves.
 end
 
 # ╔═╡ 22531e96-f0f7-45c0-a327-53094a83ddcf
@@ -146,6 +147,7 @@ end
 function sim_data_collection(θ::Float64, 
 	                         M_complete::Matrix{Int64}, 
 	                         K::Matrix{Float64})
+	@assert (θ < 1.0) && (θ > 0.0)
 	n_compounds = size(M_complete)[1]
 
 	# make list of entries in upper diagonal of the matrix
@@ -155,11 +157,11 @@ function sim_data_collection(θ::Float64,
 	# number of observed entries
 	nb_observed = floor(Int, (1-θ) * length(ids_all_pairs))
 
-	# sample observed tuples
-    ids_obs = StatsBase.sample(ids_all_pairs, nb_observed, replace=false)
-	# the rest are unobserved
-	ids_missing = [(i, j) for i = 1:n_compounds for j = i+1:n_compounds 
-		             if !((i, j) in ids_obs)]
+	# sample observed tuples. stratified split.
+	ms_all_pairs = [M_complete[i, j] for (i, j) in ids_all_pairs] # for stratifying
+
+    ids_missing, ids_obs = partition(ids_all_pairs, θ, shuffle=true, 
+		                             stratify=ms_all_pairs)
 	
 	# construct the matrix with missing values
     M = zeros(Union{Int64, Missing}, n_compounds, n_compounds)
@@ -169,12 +171,19 @@ function sim_data_collection(θ::Float64,
 		M[i, j] = M_complete[i, j]
 		M[j, i] = M_complete[i, j]
 	end
+	# refill diagonal as miscible
+	for i = 1:n_compounds
+		M[i, i] = 1
+	end
 	
     return MiscibilityData(M, n_compounds, K, ids_missing)
 end
 
+# ╔═╡ 9ff3611e-1298-4dfe-a3d4-a85d48dc0599
+partition(1:10, 0.6, shuffle=true)
+
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-data = sim_data_collection(0.4, M_complete, K)
+data = sim_data_collection(0.5, M_complete, K)
 
 # ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 any(ismissing.(data.M))
@@ -335,6 +344,8 @@ model_test
 md"## training time"
 
 # ╔═╡ 38e663bb-0de3-46c4-9e72-761ea22bc9a6
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	nb_epochs = 5000
 	losses = [NaN for _ = 1:nb_epochs]
@@ -351,20 +362,28 @@ begin
 	end
 	losses
 end
+  ╠═╡ =#
 
 # ╔═╡ 35b251bc-f26c-4923-8e26-07f4384b1a98
+#=╠═╡
 model.b
+  ╠═╡ =#
 
 # ╔═╡ ecc4032c-6b3c-42b1-b0c9-1c4b73d6a0a2
+#=╠═╡
 logistic(model.b)
+  ╠═╡ =#
 
 # ╔═╡ 422ac24b-bf1b-4d8f-88a6-c49f1b999982
+#=╠═╡
 logistic(model_γ0.b)
+  ╠═╡ =#
 
 # ╔═╡ e6bf1215-2b79-488c-b1f4-e149ca97e273
 mean(M_complete)
 
 # ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
+#=╠═╡
 begin
 	local fig = Figure()
 	local ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
@@ -373,6 +392,7 @@ begin
 	axislegend()
 	fig
 end
+  ╠═╡ =#
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -415,12 +435,17 @@ function viz_latent_space(model::Model)
 end
 
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
+#=╠═╡
 viz_latent_space(model)
+  ╠═╡ =#
 
 # ╔═╡ 690f38c0-4c89-4ba6-b372-2618b3d1cb68
+#=╠═╡
 viz_latent_space(model_γ0)
+  ╠═╡ =#
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
+#=╠═╡
 begin
 	function compute_cm(model::Model, data::MiscibilityData)
 		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
@@ -431,6 +456,7 @@ begin
 
 	cm = compute_cm(model, data)
 end
+  ╠═╡ =#
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
@@ -460,13 +486,19 @@ function viz_confusion(cm::Matrix)
 end
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
+#=╠═╡
 viz_confusion(cm) # TODO compare to random guessing
+  ╠═╡ =#
 
 # ╔═╡ f01cbe38-4c58-44c9-a5c3-56db0912d39b
+#=╠═╡
 cm
+  ╠═╡ =#
 
 # ╔═╡ 39732eda-3d69-48de-a25a-7eb8d6077df7
+#=╠═╡
 sum(cm, dims=2)
+  ╠═╡ =#
 
 # ╔═╡ 6245b563-c37d-4df8-bd01-336af78f799c
 sum([M_complete[i, j] for (i, j) in data.ids_missing] .== 0)
@@ -1941,6 +1973,7 @@ version = "3.5.0+0"
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
 # ╠═d1062c18-909e-49f7-b7b8-82a566316b64
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
+# ╠═9ff3611e-1298-4dfe-a3d4-a85d48dc0599
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
 # ╠═4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 # ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
