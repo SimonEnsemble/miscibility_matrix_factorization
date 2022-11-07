@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.19.13
 
 using Markdown
 using InteractiveUtils
@@ -148,6 +148,12 @@ mutable struct MiscibilityData
 	ids_missing::Vector{Tuple{Int, Int}}
 end
 
+# ╔═╡ 6bc8a921-999d-4be4-a35c-aa3a0383c53e
+function check_consistency(data::MiscibilityData)
+	@assert all(ismissing.([data.M[i, j] for (i, j) in data.ids_missing]))
+	@assert all(.! ismissing.([data.M[i, j] for (i, j) in data.ids_obs]))
+end
+
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
 # θ:fraction of missing entries
 # important note: we only pay attn to upper triangle of matrix.
@@ -194,6 +200,9 @@ data = sim_data_collection(0.5, M_complete, K)
 
 # ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 any(ismissing.(data.M))
+
+# ╔═╡ 6ce4bc1f-fb14-498d-8f9e-e4b76fadc14c
+check_consistency(data)
 
 # ╔═╡ 4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 viz_miscibility_matrix(data.M)
@@ -383,35 +392,54 @@ md"## hyperparam optimization"
 # ╔═╡ 0ffb60cf-3456-4546-9676-c5d33fea7377
 data
 
+# ╔═╡ 958b8d74-3a31-4c3e-981b-a614e67eb0f6
+data1
+
+# ╔═╡ 290746fe-71de-4d4f-8511-c22d48f49f91
+push!(data1.ids_missing, (1, 1))
+
+# ╔═╡ dbed5000-17a8-4d15-84d8-7eaeda82f51f
+data1.M
+
+# ╔═╡ 51edb307-8d09-4be1-893c-09a39560259a
+nfolds = 3
+
+# ╔═╡ b507d9fd-b819-4406-8408-01fde1eb42ba
+kf = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
+		              1:length(data.ids_obs), 
+	                  [data.M[i, j] for (i, j) in data.ids_obs])
+# gives indices of ids_obs
+
+# ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
+ngrid = 10
+
+# ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
+cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand()) for _ = 1:ngrid]
+
 # ╔═╡ 26152770-6849-47be-bbf2-1456afa4ebfd
 begin
-	data1 = sim_data_collection(0.5, M_complete, K)
-	nfolds = 3
-	ngrid = 10
-	const ms_obs = [data1.M[i, j] for (i, j) in data1.ids_obs]
-	const ids_obs = data1.ids_obs
-	const ids_missing = data1.ids_missing
-	
-	# indices of ids obs.
-	kf = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
-		                  1:length(data.ids_obs), ms_obs)
-	
-	hyperparam_list = [(k=rand([2,3]), γ=rand(Uniform(0,.1)), λ=rand()) for _ = 1:ngrid]
-
-	model_list = Array{Model}(undef, nfolds,ngrid)
-	metric = zeros(nfolds,ngrid)
-
-	for (m, (ids_train, ids_test)) in enumerate(kf)
-		for n = 1:ngrid
-			data1.ids_obs = ids_obs[ids_train]
-			data1.ids_missing = [ids_missing; ids_obs[ids_test]]
-			model_list[m,n], ~ = construct_train_model(hyperparam_list[n], data1, 1000, α=0.005)
-			#global ms_true= [data1.M[i, j] for (i, j) in ids_obs[ids_test]]
-			ms_true= ms_obs[ids_test]
-			ms_pred= convert.(Int,[pred_mᵢⱼ(model_list[m,n], i, j) > 0.5 for (i, j) in ids_obs[ids_test]])
-			metric[m,n] = accuracy_score(ms_true,ms_pred)
+	metric = zeros(nfolds, ngrid)
+	# loop thru folds
+	for (i_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf)
+		###
+		# create copy of data
+		# introduce missing values
+		cv_data = deepcopy(data)
+		for (i, j) in cv_data.ids_obs[ids_cv_test]
+			cv_data.M[i, j] = missing
 		end
-		
+		cv_data.ids_missing = vcat(cv_data.ids_missing, cv_data.ids_obs[ids_cv_test])
+		cv_data.ids_obs = cv_data.ids_obs[ids_cv_train]
+		check_consistency(cv_data)
+		# loop thru hyperparams
+		for (n, hps) in enumerate(cv_hyperparams)
+			# train model
+			cv_model, _ = construct_train_model(hps, data, 1000, α=0.005)
+			ms_true = [data.M[i, j] for (i, j) in cv_data.ids_obs[ids_cv_test]]
+			ms_pred = [pred_mᵢⱼ(cv_model, i, j) > 0.5 ? 1 : 0 
+				            for (i, j) in cv_data.ids_obs[ids_cv_test]]
+			metric[i_fold, n] = accuracy_score(ms_true, ms_pred)
+		end		
 	end
 end
 
@@ -564,8 +592,9 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.3"
+julia_version = "1.8.2"
 manifest_format = "2.0"
+project_hash = "23057a3e80fe2a61e079749dd9cf02d607062341"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -598,6 +627,7 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
+version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -727,6 +757,7 @@ version = "3.46.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+version = "0.5.2+0"
 
 [[deps.ComputationalResources]]
 git-tree-sha1 = "52cb3ec90e8a8bea0e62e275ba577ad0f74821f7"
@@ -810,6 +841,7 @@ version = "0.9.2"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -1149,10 +1181,12 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
+version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
+version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1161,6 +1195,7 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
+version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1290,6 +1325,7 @@ version = "0.5.3"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
+version = "2.28.0+0"
 
 [[deps.MiniQhull]]
 deps = ["QhullMiniWrapper_jll"]
@@ -1314,6 +1350,7 @@ version = "0.3.3"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
+version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1329,6 +1366,7 @@ version = "1.0.2"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
+version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "5a9ea4b9430d511980c01e9f7173739595bbd335"
@@ -1350,6 +1388,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
+version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1366,6 +1405,7 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1393,6 +1433,7 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
+version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1445,6 +1486,7 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -1578,6 +1620,7 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+version = "0.7.0"
 
 [[deps.SIMD]]
 git-tree-sha1 = "7dbc15af7ed5f751a82bf3ed37757adf76c32402"
@@ -1732,6 +1775,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1748,6 +1792,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
+version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -1896,6 +1941,7 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
+version = "1.2.12+3"
 
 [[deps.isoband_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1918,6 +1964,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
+version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1946,10 +1993,12 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
+version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1988,9 +2037,11 @@ version = "3.5.0+0"
 # ╠═c05fbffb-4f53-4e44-9735-7ee8d48835a4
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
 # ╠═d1062c18-909e-49f7-b7b8-82a566316b64
+# ╠═6bc8a921-999d-4be4-a35c-aa3a0383c53e
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
 # ╠═9ff3611e-1298-4dfe-a3d4-a85d48dc0599
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
+# ╠═6ce4bc1f-fb14-498d-8f9e-e4b76fadc14c
 # ╠═4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 # ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 # ╠═c106b08f-2025-4531-90e2-ed1d4d8e8b36
@@ -2010,6 +2061,13 @@ version = "3.5.0+0"
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
 # ╟─c939cb70-858d-4b57-977a-693097c78499
 # ╠═0ffb60cf-3456-4546-9676-c5d33fea7377
+# ╠═958b8d74-3a31-4c3e-981b-a614e67eb0f6
+# ╠═290746fe-71de-4d4f-8511-c22d48f49f91
+# ╠═dbed5000-17a8-4d15-84d8-7eaeda82f51f
+# ╠═51edb307-8d09-4be1-893c-09a39560259a
+# ╠═b507d9fd-b819-4406-8408-01fde1eb42ba
+# ╠═9eef7d3f-a121-41ff-828b-042910b56789
+# ╠═53987486-ed22-424e-b744-6033ac4be4c6
 # ╠═26152770-6849-47be-bbf2-1456afa4ebfd
 # ╠═4f72a34e-93eb-4696-ad12-b24c2e14f6f9
 # ╠═0f7be987-49f4-4bf3-b35e-73e2d3ac0647
