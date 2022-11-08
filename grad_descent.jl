@@ -104,10 +104,7 @@ function viz_miscibility_matrix(M)
 end
 
 # ╔═╡ acf912f1-51cf-4943-8964-c51cc3bf3427
-# ╠═╡ disabled = true
-#=╠═╡
 viz_miscibility_matrix(M_complete)
-  ╠═╡ =#
 
 # ╔═╡ 3a6f1f39-b598-4ce2-8858-b17551133bfe
 compound_names = String.(compounds[:, "NAME"])
@@ -151,7 +148,10 @@ end
 # ╔═╡ 6bc8a921-999d-4be4-a35c-aa3a0383c53e
 function check_consistency(data::MiscibilityData)
 	@assert all(ismissing.([data.M[i, j] for (i, j) in data.ids_missing]))
+	@assert all(ismissing.([data.M[j, i] for (i, j) in data.ids_missing]))
+	
 	@assert all(.! ismissing.([data.M[i, j] for (i, j) in data.ids_obs]))
+	@assert all(.! ismissing.([data.M[j, i] for (i, j) in data.ids_obs]))
 end
 
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
@@ -172,7 +172,6 @@ function sim_data_collection(θ::Float64,
 
 	# sample observed tuples. stratified split.
 	ms_all_pairs = [M_complete[i, j] for (i, j) in ids_all_pairs] # for stratifying
-
     ids_missing, ids_obs = partition(ids_all_pairs, θ, shuffle=true, 
 		                             stratify=ms_all_pairs)
 	
@@ -192,17 +191,11 @@ function sim_data_collection(θ::Float64,
     return MiscibilityData(M, n_compounds, K, ids_obs, ids_missing)
 end
 
-# ╔═╡ 9ff3611e-1298-4dfe-a3d4-a85d48dc0599
-partition(1:10, 0.6, shuffle=true)
-
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
 data = sim_data_collection(0.5, M_complete, K)
 
 # ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 any(ismissing.(data.M))
-
-# ╔═╡ 6ce4bc1f-fb14-498d-8f9e-e4b76fadc14c
-check_consistency(data)
 
 # ╔═╡ 4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 viz_miscibility_matrix(data.M)
@@ -219,6 +212,7 @@ begin
 			@assert data.M[i, j] == M_complete[i, j]
 		end
 	end
+	check_consistency(data)
 end
 
 # ╔═╡ eaa4560e-cb0a-47bc-87ba-9ff4e3faa2c2
@@ -351,14 +345,12 @@ end
 # ╔═╡ 52deabd5-bc18-4659-a7e5-9f42b1e5f591
 function construct_train_model(hyperparams::NamedTuple, 
 	                           data::MiscibilityData, 
-	                           nb_epochs::Int; α::Float64=0.001)
+	                           nb_epochs::Int; α::Float64=0.005)
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
-	model = Model(0.5 * rand(Uniform(-1,1),(hyperparams.k, data.n_compounds)), # C
-		b_guess, # b
-		hyperparams.γ,
-		hyperparams.λ)
+	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
+	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ)
 
 	# gradient descent epochs. keep track of loss.
 	losses = [NaN for _ = 1:nb_epochs]
@@ -372,8 +364,11 @@ end
 # ╔═╡ 8db228a7-bf2b-4f1e-ab7e-596b2957498f
 hyperparams = (k=2, γ=0.01, λ=.5)
 
+# ╔═╡ 660f9ba7-871a-43df-b69d-d792a8e75456
+nb_epochs = 1000
+
 # ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
-model, losses = construct_train_model(hyperparams, data, 1000, α=0.005)
+model, losses = construct_train_model(hyperparams, data, nb_epochs) # just an example
 
 # ╔═╡ 3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 function viz_loss(losses::Vector{Float64})
@@ -389,83 +384,76 @@ viz_loss(losses)
 # ╔═╡ c939cb70-858d-4b57-977a-693097c78499
 md"## hyperparam optimization"
 
-# ╔═╡ 0ffb60cf-3456-4546-9676-c5d33fea7377
-data
-
-# ╔═╡ 958b8d74-3a31-4c3e-981b-a614e67eb0f6
-data1
-
-# ╔═╡ 290746fe-71de-4d4f-8511-c22d48f49f91
-push!(data1.ids_missing, (1, 1))
-
-# ╔═╡ dbed5000-17a8-4d15-84d8-7eaeda82f51f
-data1.M
-
 # ╔═╡ 51edb307-8d09-4be1-893c-09a39560259a
 nfolds = 3
 
 # ╔═╡ b507d9fd-b819-4406-8408-01fde1eb42ba
-kf = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
-		              1:length(data.ids_obs), 
-	                  [data.M[i, j] for (i, j) in data.ids_obs])
+kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
+		                    1:length(data.ids_obs), 
+	                        [data.M[i, j] for (i, j) in data.ids_obs])
 # gives indices of ids_obs
 
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
-ngrid = 10
+ngrid = 15
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
-cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand()) for _ = 1:ngrid]
+cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand())
+				   for _ = 1:ngrid]
 
 # ╔═╡ 26152770-6849-47be-bbf2-1456afa4ebfd
 begin
-	metric = zeros(nfolds, ngrid)
+	# keep track of performance metric.
+	perf_metric = zeros(nfolds, ngrid)
 	# loop thru folds
-	for (i_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf)
+	for (i_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
+		# get the list of matrix entries, vector of tuples
+		cv_train_entries = data.ids_obs[ids_cv_train]
+		cv_test_entries  = data.ids_obs[ids_cv_test]
+		
 		###
 		# create copy of data
-		# introduce missing values
+		# introduce additional missing values, where the cv-test data are.
 		cv_data = deepcopy(data)
-		for (i, j) in cv_data.ids_obs[ids_cv_test]
+		for (i, j) in cv_test_entries
 			cv_data.M[i, j] = missing
+			cv_data.M[j, i] = missing
 		end
-		cv_data.ids_missing = vcat(cv_data.ids_missing, cv_data.ids_obs[ids_cv_test])
-		cv_data.ids_obs = cv_data.ids_obs[ids_cv_train]
+		cv_data.ids_missing = vcat(data.ids_missing, cv_test_entries)
+		cv_data.ids_obs = cv_train_entries
 		check_consistency(cv_data)
+		
 		# loop thru hyperparams
 		for (n, hps) in enumerate(cv_hyperparams)
 			# train model
-			cv_model, _ = construct_train_model(hps, data, 1000, α=0.005)
-			ms_true = [data.M[i, j] for (i, j) in cv_data.ids_obs[ids_cv_test]]
+			cv_model, _ = construct_train_model(hps, data, nb_epochs)
+			# evaluate on cv-test data
+			ms_true = [data.M[i, j] for (i, j) in cv_test_entries]
 			ms_pred = [pred_mᵢⱼ(cv_model, i, j) > 0.5 ? 1 : 0 
-				            for (i, j) in cv_data.ids_obs[ids_cv_test]]
-			metric[i_fold, n] = accuracy_score(ms_true, ms_pred)
+				            for (i, j) in cv_test_entries]
+			perf_metric[i_fold, n] = accuracy_score(ms_true, ms_pred)
 		end		
 	end
+	perf_metric
 end
 
-# ╔═╡ 4f72a34e-93eb-4696-ad12-b24c2e14f6f9
-begin
-	fig = Figure()
-	ax = Axis(fig[1, 1], xlabel="gamma", ylabel="accuracy")
-	gammas = [model_list[1,i].γ for i=1:size(model_list)[2]]
-	ks = [size(model_list[1,i].C)[1] for i=1:size(model_list)[2]]
-	scatter!(gammas, mean(eachrow(metric)),color=ks, label=ks)
-	#axislegend()
-	fig
-end
-
-# ╔═╡ 0f7be987-49f4-4bf3-b35e-73e2d3ac0647
-data
-
+# ╔═╡ b581e911-24ad-44f0-8cac-1966786d7953
+opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metric))[:])]
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
+
+train deployment model, `opt_model`, on all obs data using optimal hyperparams.
+analyze it more closely. 
+
 1. plot latent vectors (or PCA of them if in higher dims); color by miscibility, different markers for different classes.
 2. confusion matrix on test data
 3. plot loss as function of iters
 
 and repeat with and without graph regularization.
 "
+
+# ╔═╡ 2ccfb38a-4205-429d-9edc-76a20082d735
+opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
 
 # ╔═╡ 1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 class_to_marker = Dict("Polymer"    => :circle, 
@@ -478,6 +466,9 @@ class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSch
 
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 function viz_latent_space(model::Model)
+	if size(model.C)[1] != 2
+		@warn "need to do dim reduction first, this model not k = 2"
+	end
 	fig = Figure()
 	ax  = Axis(fig[1, 1], 
 		xlabel="latent dimension 1", 
@@ -491,7 +482,7 @@ function viz_latent_space(model::Model)
 		ids = compound_classes .== class
 		scatter!(model.C[1, ids], model.C[2, ids], 
 			strokewidth=1, strokecolor="black", marker=class_to_marker[class],
-			color=class_to_color[class], label=classc, aspect=DataAspect()
+			color=class_to_color[class], label=class, aspect=DataAspect()
 		)
 	end
 	axislegend()
@@ -499,13 +490,11 @@ function viz_latent_space(model::Model)
 end
 
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
-viz_latent_space(model)
-
-# ╔═╡ 690f38c0-4c89-4ba6-b372-2618b3d1cb68
-viz_latent_space(model_γ0)
+viz_latent_space(opt_model)
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 begin
+	# on tests data
 	function compute_cm(model::Model, data::MiscibilityData)
 		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
 		m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
@@ -513,7 +502,7 @@ begin
 		cm = confusion_matrix(m, m̂)
 	end
 
-	cm = compute_cm(model, data)
+	cm = compute_cm(opt_model, data)
 end
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
@@ -2039,9 +2028,7 @@ version = "3.5.0+0"
 # ╠═d1062c18-909e-49f7-b7b8-82a566316b64
 # ╠═6bc8a921-999d-4be4-a35c-aa3a0383c53e
 # ╠═885c20b3-6376-4ce3-991a-8e1db6e88771
-# ╠═9ff3611e-1298-4dfe-a3d4-a85d48dc0599
 # ╠═35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-# ╠═6ce4bc1f-fb14-498d-8f9e-e4b76fadc14c
 # ╠═4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 # ╟─54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 # ╠═c106b08f-2025-4531-90e2-ed1d4d8e8b36
@@ -2056,27 +2043,23 @@ version = "3.5.0+0"
 # ╠═8b9046d8-8a0b-4f4a-b461-8c20349ecd30
 # ╠═52deabd5-bc18-4659-a7e5-9f42b1e5f591
 # ╠═8db228a7-bf2b-4f1e-ab7e-596b2957498f
+# ╠═660f9ba7-871a-43df-b69d-d792a8e75456
 # ╠═ba7a3de9-b37f-4c67-869b-fceb7915ffab
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
 # ╟─c939cb70-858d-4b57-977a-693097c78499
-# ╠═0ffb60cf-3456-4546-9676-c5d33fea7377
-# ╠═958b8d74-3a31-4c3e-981b-a614e67eb0f6
-# ╠═290746fe-71de-4d4f-8511-c22d48f49f91
-# ╠═dbed5000-17a8-4d15-84d8-7eaeda82f51f
 # ╠═51edb307-8d09-4be1-893c-09a39560259a
 # ╠═b507d9fd-b819-4406-8408-01fde1eb42ba
 # ╠═9eef7d3f-a121-41ff-828b-042910b56789
 # ╠═53987486-ed22-424e-b744-6033ac4be4c6
 # ╠═26152770-6849-47be-bbf2-1456afa4ebfd
-# ╠═4f72a34e-93eb-4696-ad12-b24c2e14f6f9
-# ╠═0f7be987-49f4-4bf3-b35e-73e2d3ac0647
+# ╠═b581e911-24ad-44f0-8cac-1966786d7953
 # ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
+# ╠═2ccfb38a-4205-429d-9edc-76a20082d735
 # ╠═1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 # ╠═a120c609-f5cb-4012-9f7c-e3702269b541
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═b93b5880-3a89-4028-a2dc-b93d5c6b138d
-# ╠═690f38c0-4c89-4ba6-b372-2618b3d1cb68
 # ╠═80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
 # ╠═35666424-d5dc-4a2f-a650-3241a0952c07
