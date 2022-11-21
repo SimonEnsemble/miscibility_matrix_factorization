@@ -1,8 +1,18 @@
 ### A Pluto.jl notebook ###
-# v0.19.13
+# v0.19.14
 
 using Markdown
 using InteractiveUtils
+
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
 
 # ╔═╡ c3f6fd50-1697-11ed-1af7-c717d141dfac
 using CSV, DataFrames,Statistics, LogExpFunctions, CairoMakie,LinearAlgebra, Random , StatsBase, PlutoUI, ColorSchemes, ScikitLearn
@@ -14,7 +24,10 @@ using Distributions
 import MLJBase: partition, StratifiedCV, train_test_pairs
 
 # ╔═╡ 9cf628c4-3194-423a-90fc-94bb46c25450
-@sk_import metrics: (confusion_matrix, accuracy_score)
+@sk_import metrics: (confusion_matrix, accuracy_score, f1_score)
+
+# ╔═╡ 5df72253-8573-46e9-a21b-923e0ce3f360
+@sk_import decomposition: PCA
 
 # ╔═╡ cabd0924-cae4-4992-bf49-92353aeea388
 TableOfContents()
@@ -112,6 +125,12 @@ compound_names = String.(compounds[:, "NAME"])
 # ╔═╡ 3153dd82-8be6-4683-b93d-9629c3d3312f
 md"## similarity matrix"
 
+# ╔═╡ 5b372a54-8dd4-4f59-9acd-772e69f02f23
+@bind use_for_similarity Select(["class", "features"])
+
+# ╔═╡ 07aacbdf-bda6-4458-8af4-f5f202bb4af5
+use_for_similarity
+
 # ╔═╡ d6d83535-fa87-4de9-8ddc-0920a6bad075
 compound_classes = String.(compounds[:, "CLASS"])
 
@@ -126,7 +145,9 @@ begin
 			if i == j
 				K[i, j] = NaN # for safety
 			else
-				K[i, j] = compound_classes[i] == compound_classes[j]
+				if use_for_similarity == "class"
+					K[i, j] = compound_classes[i] == compound_classes[j]
+				end
 			end
 		end
 	end
@@ -430,7 +451,7 @@ begin
 			ms_true = [data.M[i, j] for (i, j) in cv_test_entries]
 			ms_pred = [pred_mᵢⱼ(cv_model, i, j) > 0.5 ? 1 : 0 
 				            for (i, j) in cv_test_entries]
-			perf_metric[i_fold, n] = accuracy_score(ms_true, ms_pred)
+			perf_metric[i_fold, n] = f1_score(ms_true, ms_pred)
 		end		
 	end
 	perf_metric
@@ -464,15 +485,39 @@ class_to_marker = Dict("Polymer"    => :circle,
 # ╔═╡ a120c609-f5cb-4012-9f7c-e3702269b541
 class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.Accent_4))
 
+# ╔═╡ a8f8c2f3-dfe2-44b0-9b15-ad74cd65a4ea
+begin
+	# standardize for PCA
+	C̃ = opt_model.C'
+	for c = 1:size(C̃)[2]
+		C̃[:, c] = (C̃[:, c] .- mean(C̃[:, c])) / std(C̃[:, c])
+	end
+	# the projection into 2D via PCA
+	pca = PCA(n_components=2)
+	Ĉ = pca.fit_transform(C̃)
+end
+
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 function viz_latent_space(model::Model)
-	if size(model.C)[1] != 2
-		@warn "need to do dim reduction first, this model not k = 2"
+	do_pca = size(model.C)[1] != 2
+	
+	if do_pca
+		# standardize for PCA
+		C̃ = opt_model.C'
+		for c = 1:size(C̃)[2]
+			C̃[:, c] = (C̃[:, c] .- mean(C̃[:, c])) / std(C̃[:, c])
+		end
+		# the projection into 2D via PCA
+		pca = PCA(n_components=2)
+		Ĉ = pca.fit_transform(C̃)'
+	else
+		Ĉ = model.C
 	end
+	
 	fig = Figure()
 	ax  = Axis(fig[1, 1], 
-		xlabel="latent dimension 1", 
-		ylabel="latent dimension 2",
+		xlabel=do_pca ? "PC1" : "latent dimension 1", 
+		ylabel=do_pca ? "PC2" : "latent dimension 2",
 		aspect=DataAspect()
 	)
 	
@@ -480,7 +525,7 @@ function viz_latent_space(model::Model)
 	hlines!(0.0, color="gray")
 	for class in ["Polymer", "Protein", "Surfactant", "Salt"]
 		ids = compound_classes .== class
-		scatter!(model.C[1, ids], model.C[2, ids], 
+		scatter!(Ĉ[1, ids], Ĉ[2, ids], 
 			strokewidth=1, strokecolor="black", marker=class_to_marker[class],
 			color=class_to_color[class], label=class, aspect=DataAspect()
 		)
@@ -2007,6 +2052,7 @@ version = "3.5.0+0"
 # ╠═7b533d68-4bb8-4b1d-a48f-0adffc99ae97
 # ╠═b683bdc4-9956-4176-9c03-bebf15d0243e
 # ╠═9cf628c4-3194-423a-90fc-94bb46c25450
+# ╠═5df72253-8573-46e9-a21b-923e0ce3f360
 # ╠═cabd0924-cae4-4992-bf49-92353aeea388
 # ╟─f924129b-4e85-45b4-95ce-6846d69d16f3
 # ╠═b9e723cf-3af9-40b7-a9de-61893c633d53
@@ -2021,6 +2067,8 @@ version = "3.5.0+0"
 # ╠═acf912f1-51cf-4943-8964-c51cc3bf3427
 # ╠═3a6f1f39-b598-4ce2-8858-b17551133bfe
 # ╟─3153dd82-8be6-4683-b93d-9629c3d3312f
+# ╠═5b372a54-8dd4-4f59-9acd-772e69f02f23
+# ╠═07aacbdf-bda6-4458-8af4-f5f202bb4af5
 # ╠═d6d83535-fa87-4de9-8ddc-0920a6bad075
 # ╠═e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
 # ╠═c05fbffb-4f53-4e44-9735-7ee8d48835a4
@@ -2058,6 +2106,7 @@ version = "3.5.0+0"
 # ╠═2ccfb38a-4205-429d-9edc-76a20082d735
 # ╠═1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 # ╠═a120c609-f5cb-4012-9f7c-e3702269b541
+# ╠═a8f8c2f3-dfe2-44b0-9b15-ad74cd65a4ea
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═b93b5880-3a89-4028-a2dc-b93d5c6b138d
 # ╠═80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
