@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.14
+# v0.19.9
 
 using Markdown
 using InteractiveUtils
@@ -19,6 +19,9 @@ using CSV, DataFrames,Statistics, LogExpFunctions, CairoMakie,LinearAlgebra, Ran
 
 # ╔═╡ b683bdc4-9956-4176-9c03-bebf15d0243e
 using Distributions
+
+# ╔═╡ 57a6f607-cd48-4e57-a452-06e0fcdd435c
+using KernelFunctions
 
 # ╔═╡ 7b533d68-4bb8-4b1d-a48f-0adffc99ae97
 import MLJBase: partition, StratifiedCV, train_test_pairs
@@ -75,10 +78,21 @@ end
 
 # ╔═╡ 22531e96-f0f7-45c0-a327-53094a83ddcf
 begin
-	compounds = CSV.read("compounds.csv", DataFrame)
+	#compounds = CSV.read("compounds.csv", DataFrame)
+	compounds = CSV.read("compounds1.csv", DataFrame)
 	# add ATPS (Aqueous Two-Phase System) forming fractions data
 	compounds[:, :ATPS_frac] = 1 .- sum(M_complete, dims=2)[:] / n_compounds
+	
+	feature_names = ["monomer_mw","XlogP3","h-bond_donors","h-bond_acceptors","complexity","concentration","polymer_mw"]
+
+	#compounds_normalized = float.(compounds[:,feature_names])
+	compounds_normalized = zeros(size(compounds)[1],length(feature_names))
+	
+	for (j,f) in enumerate(feature_names)
+		compounds_normalized[:,j] .= (compounds[:,f] .- mean(compounds_normalized[:,j]))./std(compounds[:,f])
+	end
 	compounds
+	
 end
 
 # ╔═╡ 9b0388ac-a640-4ffa-8531-b1ae7b68393f
@@ -139,6 +153,7 @@ unique(compound_classes)
 
 # ╔═╡ c05fbffb-4f53-4e44-9735-7ee8d48835a4
 begin
+	kernel = SqExponentialKernel()∘ ScaleTransform(1)
 	K = zeros(n_compounds, n_compounds)
 	for i = 1:n_compounds
 		for j = 1:n_compounds
@@ -147,6 +162,8 @@ begin
 			else
 				if use_for_similarity == "class"
 					K[i, j] = compound_classes[i] == compound_classes[j]
+				elseif use_for_similarity == "features"
+					K[i, j] = kernel(compounds_normalized[i,:]',compounds_normalized[j,:]')
 				end
 			end
 		end
@@ -415,7 +432,7 @@ kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
 # gives indices of ids_obs
 
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
-ngrid = 15
+ngrid = 5
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
 cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand())
@@ -600,6 +617,7 @@ CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+KernelFunctions = "ec8451be-7e33-11e9-00cf-bbf324bd1392"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 MLJBase = "a7f614a8-145f-11e9-1d2a-a57a1082229d"
@@ -615,6 +633,7 @@ CairoMakie = "~0.9.1"
 ColorSchemes = "~3.19.0"
 DataFrames = "~1.3.6"
 Distributions = "~0.25.76"
+KernelFunctions = "~0.10.50"
 LogExpFunctions = "~0.3.18"
 MLJBase = "~0.20.20"
 PlutoUI = "~0.7.48"
@@ -626,9 +645,8 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.2"
+julia_version = "1.7.3"
 manifest_format = "2.0"
-project_hash = "23057a3e80fe2a61e079749dd9cf02d607062341"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -661,7 +679,6 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -791,7 +808,11 @@ version = "3.46.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.5.2+0"
+
+[[deps.CompositionsBase]]
+git-tree-sha1 = "455419f7e328a1a2493cabc6428d79e951349769"
+uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
+version = "0.1.1"
 
 [[deps.ComputationalResources]]
 git-tree-sha1 = "52cb3ec90e8a8bea0e62e275ba577ad0f74821f7"
@@ -856,6 +877,12 @@ git-tree-sha1 = "80c3e8639e3353e5d2912fb3a1916b8455e2494b"
 uuid = "b429d917-457f-4dbc-8f4c-0cc954292b1d"
 version = "0.4.0"
 
+[[deps.Distances]]
+deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "3258d0659f812acde79e8a74b11f17ac06d0ca04"
+uuid = "b4f34e82-e78d-54a5-968a-f98e89d6e8f7"
+version = "0.10.7"
+
 [[deps.Distributed]]
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -875,7 +902,6 @@ version = "0.9.2"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -986,6 +1012,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
+
+[[deps.Functors]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "a2657dd0f3e8a61dbe70fc7c122038bd33790af5"
+uuid = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
+version = "0.3.0"
 
 [[deps.Future]]
 deps = ["Random"]
@@ -1186,6 +1218,12 @@ git-tree-sha1 = "9816b296736292a80b9a3200eb7fbb57aaa3917a"
 uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 version = "0.6.5"
 
+[[deps.KernelFunctions]]
+deps = ["ChainRulesCore", "Compat", "CompositionsBase", "Distances", "FillArrays", "Functors", "IrrationalConstants", "LinearAlgebra", "LogExpFunctions", "Random", "Requires", "SpecialFunctions", "Statistics", "StatsBase", "TensorCore", "Test", "ZygoteRules"]
+git-tree-sha1 = "83109ba5a3eafcd7d636f409851a3c531a773851"
+uuid = "ec8451be-7e33-11e9-00cf-bbf324bd1392"
+version = "0.10.50"
+
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "f6250b16881adf048549549fba48b1161acdac8c"
@@ -1215,12 +1253,10 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1229,7 +1265,6 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1359,7 +1394,6 @@ version = "0.5.3"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.0+0"
 
 [[deps.MiniQhull]]
 deps = ["QhullMiniWrapper_jll"]
@@ -1384,7 +1418,6 @@ version = "0.3.3"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1400,7 +1433,6 @@ version = "1.0.2"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
-version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "5a9ea4b9430d511980c01e9f7173739595bbd335"
@@ -1422,7 +1454,6 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1439,7 +1470,6 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1467,7 +1497,6 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1520,7 +1549,6 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -1654,7 +1682,6 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
-version = "0.7.0"
 
 [[deps.SIMD]]
 git-tree-sha1 = "7dbc15af7ed5f751a82bf3ed37757adf76c32402"
@@ -1809,7 +1836,6 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1826,7 +1852,6 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -1975,7 +2000,12 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.12+3"
+
+[[deps.ZygoteRules]]
+deps = ["MacroTools"]
+git-tree-sha1 = "8c1a8e4dfacb1fd631745552c8db35d0deb09ea0"
+uuid = "700de1a5-db45-46bc-99cf-38207098b444"
+version = "0.2.2"
 
 [[deps.isoband_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1998,7 +2028,6 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2027,12 +2056,10 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2051,6 +2078,7 @@ version = "3.5.0+0"
 # ╠═c3f6fd50-1697-11ed-1af7-c717d141dfac
 # ╠═7b533d68-4bb8-4b1d-a48f-0adffc99ae97
 # ╠═b683bdc4-9956-4176-9c03-bebf15d0243e
+# ╠═57a6f607-cd48-4e57-a452-06e0fcdd435c
 # ╠═9cf628c4-3194-423a-90fc-94bb46c25450
 # ╠═5df72253-8573-46e9-a21b-923e0ce3f360
 # ╠═cabd0924-cae4-4992-bf49-92353aeea388
