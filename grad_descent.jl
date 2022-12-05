@@ -147,21 +147,30 @@ compound_names = String.(compounds[:, "NAME"])
 # ╔═╡ 3153dd82-8be6-4683-b93d-9629c3d3312f
 md"## similarity matrix"
 
-# ╔═╡ 5b372a54-8dd4-4f59-9acd-772e69f02f23
-use_for_similarity = "features" # "class"
-
-# ╔═╡ 07aacbdf-bda6-4458-8af4-f5f202bb4af5
-use_for_similarity
-
 # ╔═╡ d6d83535-fa87-4de9-8ddc-0920a6bad075
 compound_classes = String.(compounds[:, "CLASS"])
 
 # ╔═╡ e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
 unique(compound_classes)
 
-# ╔═╡ c05fbffb-4f53-4e44-9735-7ee8d48835a4
-begin
-	kernel = SqExponentialKernel() ∘ ScaleTransform(1)
+# ╔═╡ e6608357-deeb-4bc4-b5b6-5b5b50f07a3d
+function kernel_matrix(σ::Nothing)
+	K = zeros(n_compounds, n_compounds)
+	for i = 1:n_compounds
+		for j = 1:n_compounds
+			if i == j
+				K[i, j] = NaN # for safety
+			else
+				K[i, j] = compound_classes[i] == compound_classes[j]
+			end
+		end
+	end
+	return K
+end
+
+# ╔═╡ 32837121-174a-498a-9586-a5e4ac13398c
+function kernel_matrix(σ::Float64)
+	kernel = SqExponentialKernel() ∘ ScaleTransform(σ)
 	
 	K = zeros(n_compounds, n_compounds)
 	for i = 1:n_compounds
@@ -169,16 +178,18 @@ begin
 			if i == j
 				K[i, j] = NaN # for safety
 			else
-				if use_for_similarity == "class"
-					K[i, j] = compound_classes[i] == compound_classes[j]
-				elseif use_for_similarity == "features"
-					K[i, j] = kernel(feature_matrix[i, :]', feature_matrix[j, :]')
-				end
+				K[i, j] = kernel(feature_matrix[i, :]', feature_matrix[j, :]')
 			end
 		end
 	end
-	K
+	return K
 end
+
+# ╔═╡ 4aea5499-5cdc-41e4-ad84-ae0eaf6c69e5
+kernel_matrix(nothing)
+
+# ╔═╡ 1be7e102-d7e9-4c08-989b-211ae302754e
+kernel_matrix(0.1)
 
 # ╔═╡ ee675570-94ef-4061-9438-7e60a0e5dae1
 md"## introducing missing values"
@@ -187,7 +198,9 @@ md"## introducing missing values"
 mutable struct MiscibilityData
 	M::Matrix{Union{Int64, Missing}}
 	n_compounds::Int
-	K::Matrix{Float64} #kernel function
+	compound_names::Vector{String}
+	compound_classes::Vector{String}
+	X::Matrix{Float64} # feature matrix
 	ids_obs::Vector{Tuple{Int, Int}}
 	ids_missing::Vector{Tuple{Int, Int}}
 	class_wt::Tuple{Float64, Float64}
@@ -205,9 +218,7 @@ end
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
 # θ:fraction of missing entries
 # important note: we only pay attn to upper triangle of matrix.
-function sim_data_collection(θ::Float64, 
-	                         M_complete::Matrix{Int64}, 
-	                         K::Matrix{Float64})
+function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
 	@assert (θ < 1.0) && (θ > 0.0)
 	n_compounds = size(M_complete)[1]
 
@@ -240,11 +251,11 @@ function sim_data_collection(θ::Float64,
 	fraction_miscible = mean([M[i, j] for (i, j) in ids_obs])
 	class_wt = (1.0, (1 - fraction_miscible) / fraction_miscible)
 	
-    return MiscibilityData(M, n_compounds, K, ids_obs, ids_missing, class_wt)
+    return MiscibilityData(M, n_compounds, compound_names, compound_classes, feature_matrix, ids_obs, ids_missing, class_wt)
 end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-data = sim_data_collection(0.5, M_complete, K)
+data = sim_data_collection(0.5, M_complete)
 
 # ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 any(ismissing.(data.M))
@@ -276,6 +287,7 @@ mutable struct Model
 	b::Float64
 	γ::Float64 # regularization param for graph structure
 	λ::Float64 # regularization param on latent reps
+	σ::Union{Float64, Nothing} # scale param
 end
 
 # ╔═╡ af50a2c4-d8aa-49bd-b596-39964d2d8c7e
@@ -286,7 +298,7 @@ function pred_mᵢⱼ(model::Model, i::Int, j::Int)
 end
 
 # ╔═╡ 500a3554-0bbf-42d2-ae4b-0b6c59dbeea6
-function loss(data::MiscibilityData, model::Model)
+function loss(data::MiscibilityData, model::Model, K::Matrix{Float64})
 	# code below assumes M all 0's or 1's
 	@assert all(skipmissing(data.M) .== 1 .|| skipmissing(data.M) .== 0)
 	# latent vectors are columns of C
@@ -303,7 +315,7 @@ function loss(data::MiscibilityData, model::Model)
 			###
 			cᵢ = model.C[:, i]
 			cⱼ = model.C[:, j]
-			l += model.γ * data.K[i, j] * sum((cᵢ - cⱼ) .^ 2)
+			l += model.γ * K[i, j] * sum((cᵢ - cⱼ) .^ 2)
 			
 			###
 			#    mis-match term
@@ -326,7 +338,7 @@ function loss(data::MiscibilityData, model::Model)
 end
 
 # ╔═╡ 4758b6e9-3c01-42b4-85bf-30ac2298e511
-function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int)
+function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int, K::Matrix{Float64})
 	∇ = zeros(size(model.C)[1])
 	
 	∇ += model.λ * 2 * model.C[:, c] # regularize latent rep.
@@ -336,7 +348,7 @@ function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int)
 		#   contribution to gradient by reg. term 
 		###
 		if c != j
-			∇ += model.γ * data.K[c, j] * 2 * (model.C[:, c] - model.C[:, j]) # graph
+			∇ += model.γ * K[c, j] * 2 * (model.C[:, c] - model.C[:, j]) # graph
 		end
 		
 		###
@@ -377,10 +389,10 @@ function ∇_b(data::MiscibilityData, model::Model)
 end
 
 # ╔═╡ c44a5395-8143-4e33-9eff-dd7f01a1217b
-function grad_descent_epoch!(data::MiscibilityData, model::Model; α::Float64=0.01)
+function grad_descent_epoch!(data::MiscibilityData, model::Model, K::Matrix{Float64}; α::Float64=0.01)
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
-		model.C[:, c] -= α * ∇_cᵢ(data, model, c)
+		model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
 	end
 	# update bias
 	model.b -= α * ∇_b(data, model)
@@ -403,19 +415,22 @@ function construct_train_model(hyperparams::NamedTuple,
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
 	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
-	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ)
+	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ)
+
+	# compute kernel matrix
+	K = kernel_matrix(hyperparams.σ)
 
 	# gradient descent epochs. keep track of loss.
 	losses = [NaN for _ = 1:nb_epochs]
 	for s = 1:nb_epochs
-		grad_descent_epoch!(data, model, α=α)
-		losses[s] = loss(data, model)
+		grad_descent_epoch!(data, model, K, α=α)
+		losses[s] = loss(data, model, K)
 	end
 	return model, losses
 end
 
 # ╔═╡ 8db228a7-bf2b-4f1e-ab7e-596b2957498f
-hyperparams = (k=2, γ=0.01, λ=.5)
+hyperparams = (k=2, γ=0.01, λ=.5, σ=0.1)
 
 # ╔═╡ 660f9ba7-871a-43df-b69d-d792a8e75456
 nb_epochs = 1000
@@ -442,24 +457,20 @@ viz_loss(losses)
 # ╔═╡ c939cb70-858d-4b57-977a-693097c78499
 md"## hyperparam optimization"
 
-# ╔═╡ 51edb307-8d09-4be1-893c-09a39560259a
-nfolds = 3
-
-# ╔═╡ b507d9fd-b819-4406-8408-01fde1eb42ba
-kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
-		                    1:length(data.ids_obs), 
-	                        [data.M[i, j] for (i, j) in data.ids_obs])
-# gives indices of ids_obs
-
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
 ngrid = 5
 
-# ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
-cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand())
-				   for _ = 1:ngrid]
+# ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
+function do_hyperparam_optimization(
+	data::MiscibilityData,
+	cv_hyperparams::Vector{<:NamedTuple};
+	nfolds::Int=3
+)
+	# cross-validation split
+	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
+		                    1:length(data.ids_obs), 
+	                        [data.M[i, j] for (i, j) in data.ids_obs])
 
-# ╔═╡ 26152770-6849-47be-bbf2-1456afa4ebfd
-begin
 	# keep track of performance metric.
 	perf_metric = zeros(nfolds, ngrid)
 	fill!(perf_metric, NaN)
@@ -496,14 +507,18 @@ begin
 			perf_metric[i_fold, n] = f1_score(ms_true, ms_pred)
 		end		
 	end
-	perf_metric
+
+	opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metric))[:])]
+
+	return perf_metric, opt_hyperparams, fig_losses
 end
 
-# ╔═╡ 1de2fca9-892c-45fd-ba42-1f4a39a1befe
-fig_losses
+# ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
+cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=rand())
+				   for _ = 1:ngrid]
 
-# ╔═╡ b581e911-24ad-44f0-8cac-1966786d7953
-opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metric))[:])]
+# ╔═╡ 434193a3-3b06-494d-b7db-09f152ad437f
+perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams)
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -643,6 +658,14 @@ M_complete
 # ╔═╡ 69ae7968-e6a7-46e7-8506-f0ea2b30e047
 data.ids_missing
 
+# ╔═╡ c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
+md"## big function"
+
+# ╔═╡ 8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
+function run_experiment(θ::Float64)
+	
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -683,7 +706,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "5b41e86086f8a164945155c9ed51d79ea8ebb447"
+project_hash = "8fb5a03e9c81bed5efb946af98cae7a56f531d16"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -2236,11 +2259,12 @@ version = "3.5.0+0"
 # ╠═acf912f1-51cf-4943-8964-c51cc3bf3427
 # ╠═3a6f1f39-b598-4ce2-8858-b17551133bfe
 # ╟─3153dd82-8be6-4683-b93d-9629c3d3312f
-# ╠═5b372a54-8dd4-4f59-9acd-772e69f02f23
-# ╠═07aacbdf-bda6-4458-8af4-f5f202bb4af5
 # ╠═d6d83535-fa87-4de9-8ddc-0920a6bad075
 # ╠═e2e9ae6a-f156-4a91-a63c-6ab7365fe19b
-# ╠═c05fbffb-4f53-4e44-9735-7ee8d48835a4
+# ╠═e6608357-deeb-4bc4-b5b6-5b5b50f07a3d
+# ╠═4aea5499-5cdc-41e4-ad84-ae0eaf6c69e5
+# ╠═32837121-174a-498a-9586-a5e4ac13398c
+# ╠═1be7e102-d7e9-4c08-989b-211ae302754e
 # ╟─ee675570-94ef-4061-9438-7e60a0e5dae1
 # ╠═d1062c18-909e-49f7-b7b8-82a566316b64
 # ╠═6bc8a921-999d-4be4-a35c-aa3a0383c53e
@@ -2266,13 +2290,10 @@ version = "3.5.0+0"
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
 # ╟─c939cb70-858d-4b57-977a-693097c78499
-# ╠═51edb307-8d09-4be1-893c-09a39560259a
-# ╠═b507d9fd-b819-4406-8408-01fde1eb42ba
+# ╠═92cd854b-fb84-4981-ba8e-b24ecd1509c7
 # ╠═9eef7d3f-a121-41ff-828b-042910b56789
 # ╠═53987486-ed22-424e-b744-6033ac4be4c6
-# ╠═26152770-6849-47be-bbf2-1456afa4ebfd
-# ╠═1de2fca9-892c-45fd-ba42-1f4a39a1befe
-# ╠═b581e911-24ad-44f0-8cac-1966786d7953
+# ╠═434193a3-3b06-494d-b7db-09f152ad437f
 # ╟─f1da061e-a8f2-4074-92cf-6183e50e10ba
 # ╠═2ccfb38a-4205-429d-9edc-76a20082d735
 # ╠═1d7cc2ed-f383-4a0b-85aa-849f3f95f983
@@ -2288,5 +2309,7 @@ version = "3.5.0+0"
 # ╠═d508d3f9-ac1a-463b-9930-aa403df25558
 # ╠═8d664f82-2436-4f6a-9769-f468a1828d6d
 # ╠═69ae7968-e6a7-46e7-8506-f0ea2b30e047
+# ╟─c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
+# ╠═8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
