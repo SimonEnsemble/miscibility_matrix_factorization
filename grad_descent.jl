@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.19.16
 
 using Markdown
 using InteractiveUtils
@@ -23,7 +23,7 @@ AlgebraOfGraphics.set_aog_theme!(fonts=[AlgebraOfGraphics.firasans("Light"), Alg
 import MLJBase: partition, StratifiedCV, train_test_pairs
 
 # ╔═╡ 9cf628c4-3194-423a-90fc-94bb46c25450
-@sk_import metrics: (confusion_matrix, accuracy_score, f1_score)
+@sk_import metrics: (confusion_matrix, accuracy_score, f1_score, precision_score, recall_score)
 
 # ╔═╡ 5df72253-8573-46e9-a21b-923e0ce3f360
 @sk_import decomposition: PCA
@@ -219,7 +219,9 @@ end
 # ╔═╡ 885c20b3-6376-4ce3-991a-8e1db6e88771
 # θ:fraction of missing entries
 # important note: we only pay attn to upper triangle of matrix.
-function sim_data_collection(θ::Float64, M_complete::Matrix{Int64})
+function sim_data_collection(θ::Float64, M_complete::Matrix{Int64}; seed::Int=97330)
+	Random.seed!(seed)
+	
 	@assert (θ < 1.0) && (θ > 0.0)
 	n_compounds = size(M_complete)[1]
 
@@ -411,14 +413,15 @@ end
 # ╔═╡ 52deabd5-bc18-4659-a7e5-9f42b1e5f591
 function construct_train_model(hyperparams::NamedTuple, 
 	                           data::MiscibilityData, 
-	                           nb_epochs::Int; α::Float64=0.01)
+	                           nb_epochs::Int; 
+							   α::Float64=0.01)
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
 	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
 	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ)
 
-	# compute kernel matrix
+	# compute kernel matrix. note σ can be nothing.
 	K = kernel_matrix(hyperparams.σ)
 
 	# gradient descent epochs. keep track of loss.
@@ -458,6 +461,26 @@ viz_loss(losses)
 # ╔═╡ c939cb70-858d-4b57-977a-693097c78499
 md"## hyperparam optimization"
 
+# ╔═╡ 6ceaf279-5e77-4585-812b-506c152fd6ab
+function compute_perf_metrics(model::Model, 
+	                          data::MiscibilityData, 
+	                          ids::Vector{Tuple{Int, Int}})
+	m = [M_complete[i, j]            for (i, j) in ids]
+	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in ids]
+
+	return (f1=f1_score(m, m̂),
+		    accuracy=accuracy_score(m, m̂),
+	        precision=precision_score(m, m̂),
+		    recall=recall_score(m, m̂)
+	)
+end
+
+# ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
+compute_perf_metrics(model, data, data.ids_missing)[:f1]
+
+# ╔═╡ 5efedaad-892f-4005-8ea2-27ce5b3fd7d8
+perf_metrics
+
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
 ngrid = 10
 
@@ -465,7 +488,8 @@ ngrid = 10
 function do_hyperparam_optimization(
 	data::MiscibilityData,
 	cv_hyperparams::Vector{<:NamedTuple};
-	nfolds::Int=3
+	nfolds::Int=3,
+	type_of_perf_metric::Symbol=:f1
 )
 	# cross-validation split
 	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
@@ -473,8 +497,8 @@ function do_hyperparam_optimization(
 	                        [data.M[i, j] for (i, j) in data.ids_obs])
 
 	# keep track of performance metric.
-	perf_metric = zeros(nfolds, ngrid)
-	fill!(perf_metric, NaN)
+	perf_metrics = zeros(nfolds, ngrid)
+	fill!(perf_metrics, NaN)
 
 	fig_losses = Figure()
 	axs = [Axis(fig_losses[i, j]) for i = 1:nfolds, j = 1:ngrid]
@@ -502,17 +526,15 @@ function do_hyperparam_optimization(
 			cv_model, cv_losses = construct_train_model(hps, data, nb_epochs)
 			#_viz_loss!(axs[i_fold, n], cv_losses)
 			# evaluate on cv-test data
-			ms_true = [data.M[i, j] for (i, j) in cv_test_entries]
-			ms_pred = [pred_mᵢⱼ(cv_model, i, j) > 0.5 ? 1 : 0 
-				            for (i, j) in cv_test_entries]
-			perf_metric[i_fold, n] = f1_score(ms_true, ms_pred)
+			perf_metric = compute_perf_metrics(cv_model, cv_data, cv_test_entries)
+			perf_metrics[i_fold, n] = perf_metric[type_of_perf_metric]
 			#perf_metric[i_fold, n] = accuracy_score(ms_true, ms_pred)
 		end		
 	end
 
-	opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metric))[:])]
+	opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metrics))[:])]
 
-	return perf_metric, opt_hyperparams, fig_losses
+	return perf_metrics, opt_hyperparams, fig_losses
 end
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
@@ -588,14 +610,13 @@ end
 viz_latent_space(opt_model)
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
-	# on tests data
-	function compute_cm(model::Model, data::MiscibilityData)
-		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
-		m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
-	
-		cm = confusion_matrix(m, m̂)
-	end
+# on tests data
+function compute_cm(model::Model, data::MiscibilityData)
+	m = [M_complete[i, j]            for (i, j) in data.ids_missing]
+	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
 
+	cm = confusion_matrix(m, m̂)
+end
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
@@ -625,6 +646,14 @@ function viz_confusion(cm::Matrix)
 end
 
 # ╔═╡ 4edc1e98-24b6-4cc0-823e-db7137e9ac9a
+cory = 5.0
+
+# ╔═╡ a6e3639c-3974-4556-8f45-7fc69a1cd426
+function eraser(x)
+	cory = 6.0
+end
+
+# ╔═╡ 0fb063c6-ff71-4b7b-9ae0-e4022443f046
 
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
@@ -664,54 +693,83 @@ data.ids_missing
 md"## big function"
 
 # ╔═╡ 8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
-function run_experiment(θ::Float64; nfolds::Int = 3, ngrid::Int = 10, class_kernel::Bool = true)
-	
-	data = sim_data_collection(θ, M_complete)
-	
-	if class_kernel
-		cv_hyperparams = [(k= rand([3,4]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing) for _ = 1:ngrid]
-	else
-		cv_hyperparams = [(k= rand([3,4]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=rand(Uniform(1e-1, 2))) for _ = 1:ngrid]
-	end
-	
-	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams, nfolds=nfolds)
-	nb_epochs = 1000
+function run_experiment(θ::Float64; 
+                        nfolds::Int=3, 
+                        ngrid::Int=10, 
+					    nb_epochs::Int=1000,
+                        graph_regularization::Bool=true,
+                        class_kernel::Bool=true,
+					    seed::Int=97330
+)
+	# introduce missing values into the matrix.
+	data = sim_data_collection(θ, M_complete, seed=seed)
+
+	# create list of hyperparams to explore.
+	Random.seed!(seed)
+	cv_hyperparams = [
+		(k = rand([2, 3, 4, 5]), 
+		 γ = graph_regularization ? rand(Uniform(0, 0.1)) : 0.0, 
+		 λ = rand(), 
+		 σ = class_kernel ? nothing : rand(Uniform(1e-1, 2))
+		)
+		    for _ = 1:ngrid]
+
+	# conduct hyper-param optimization viz K-folds cross validation on training data
+	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(
+		          data, cv_hyperparams, nfolds=nfolds)
+
+	# train deployment model on all training data with opt hyper-params
 	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
-	
-	return data, opt_model, perf_metric, opt_hyperparams, fig_losses
+
+	# compute performance metrics on train and test
+	perf_metrics = (test =compute_perf_metrics(opt_model, data, data.ids_missing),
+		            train=compute_perf_metrics(opt_model, data, data.ids_obs))
+
+	# confusion matrix on test
+	cm = compute_cm(opt_model, data)
+
+	return (data=data, opt_model=opt_model, perf_metrics=perf_metrics, 
+		    opt_hyperparams=opt_hyperparams, fig_losses=fig_losses, cm=cm)
 end
 
 # ╔═╡ 0b47f501-95fe-48ca-9627-8db4c764e2e3
-data1, opt_model1, perf_metric1, opt_hyperparams1, fig_losses1 = run_experiment(.5)
+results_class_kernel = run_experiment(0.5, class_kernel=true)
 
-# ╔═╡ 4a9df9d5-6303-43c4-8f56-a6aab0dfb083
-cm1 = compute_cm(opt_model1, data1)
+# ╔═╡ dd97d9ee-c755-4bdc-86fd-58cebbb638f1
+viz_confusion(results_class_kernel.cm)
 
-# ╔═╡ 21e6a494-31fe-4479-b826-d6ceca538b62
-perf_metric1[argmax(mean(eachcol(perf_metric1))[:])]
+# ╔═╡ bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
+results_features = run_experiment(0.5, class_kernel=false)
+
+# ╔═╡ e339ad29-f74f-4c3c-be0c-e28c67d920a3
+md"show confusion matrix and similarity matrix and clustering for a _typical_ example (median F1 score)"
+
+# ╔═╡ b836b38e-b90e-4e7b-99fd-4c8eedf88676
+md"bar plot of recall, acc, pre, rec over 10 runs"
+
+# ╔═╡ f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
+
 
 # ╔═╡ 528cc8ca-63b0-47fc-ac29-92f25e04224a
+# ╠═╡ disabled = true
+#=╠═╡
 data2, opt_model2, perf_metric2, opt_hyperparams2, fig_losses2 = run_experiment(.5, class_kernel = false)
+  ╠═╡ =#
 
 # ╔═╡ 347f6868-6db2-4ba7-b672-b996e71b4b5b
+#=╠═╡
 perf_metric2[argmax(mean(eachcol(perf_metric2))[:])]
+  ╠═╡ =#
 
 # ╔═╡ f526f24c-0e69-4cfe-9cc7-cc9ec60bc9f1
+#=╠═╡
 cm2 = compute_cm(opt_model2, data2)
-
-# ╔═╡ 6ceaf279-5e77-4585-812b-506c152fd6ab
-function compute_metric(model::Model, data::MiscibilityData)
-		m = [M_complete[i, j]            for (i, j) in data.ids_missing]
-		m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
-	
-		return  f1_score(m, m̂)
-	end
+  ╠═╡ =#
 
 # ╔═╡ 0da70997-abca-4d2a-96d7-9800e75cffbf
+#=╠═╡
 compute_metric(opt_model2, data2)
-
-# ╔═╡ 45e9a193-ddb8-4f42-843a-adfca5da4131
-compute_metric(opt_model1, data1)
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -751,8 +809,9 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.3"
+julia_version = "1.8.2"
 manifest_format = "2.0"
+project_hash = "f04ffbe296aafabf7e2bb56bdfc5a5d72b2e1daa"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -791,6 +850,7 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
+version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -926,6 +986,7 @@ version = "4.5.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+version = "0.5.2+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "455419f7e328a1a2493cabc6428d79e951349769"
@@ -1026,6 +1087,7 @@ version = "0.9.3"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -1412,10 +1474,12 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
+version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
+version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1424,6 +1488,7 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
+version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1448,9 +1513,9 @@ version = "1.42.0+0"
 
 [[deps.Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "42b62845d70a619f063a7da093d995ec8e15e778"
+git-tree-sha1 = "c7cb1f5d892775ba13767a87c7ada0b980ea0a71"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.16.1+1"
+version = "1.16.1+2"
 
 [[deps.Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1559,6 +1624,7 @@ version = "0.5.4"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
+version = "2.28.0+0"
 
 [[deps.MiniQhull]]
 deps = ["QhullMiniWrapper_jll"]
@@ -1583,6 +1649,7 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
+version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1598,6 +1665,7 @@ version = "1.1.0"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
+version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
@@ -1619,6 +1687,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
+version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1635,6 +1704,7 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1662,6 +1732,7 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
+version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1714,6 +1785,7 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -1852,6 +1924,7 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+version = "0.7.0"
 
 [[deps.SIMD]]
 git-tree-sha1 = "bc12e315740f3a36a6db85fa2c0212a848bd239e"
@@ -2034,6 +2107,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -2050,6 +2124,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
+version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -2203,6 +2278,7 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
+version = "1.2.12+3"
 
 [[deps.ZygoteRules]]
 deps = ["MacroTools"]
@@ -2231,6 +2307,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
+version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2259,10 +2336,12 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
+version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2333,7 +2412,10 @@ version = "3.5.0+0"
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
 # ╟─c939cb70-858d-4b57-977a-693097c78499
+# ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
 # ╠═92cd854b-fb84-4981-ba8e-b24ecd1509c7
+# ╠═53349731-ff98-4ed7-9877-fe8cf389e6e3
+# ╠═5efedaad-892f-4005-8ea2-27ce5b3fd7d8
 # ╠═9eef7d3f-a121-41ff-828b-042910b56789
 # ╠═53987486-ed22-424e-b744-6033ac4be4c6
 # ╠═434193a3-3b06-494d-b7db-09f152ad437f
@@ -2346,6 +2428,8 @@ version = "3.5.0+0"
 # ╠═80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
 # ╠═4edc1e98-24b6-4cc0-823e-db7137e9ac9a
+# ╠═a6e3639c-3974-4556-8f45-7fc69a1cd426
+# ╠═0fb063c6-ff71-4b7b-9ae0-e4022443f046
 # ╠═35666424-d5dc-4a2f-a650-3241a0952c07
 # ╟─0fd7342c-a459-40dc-9fd8-c8b1d8103c61
 # ╠═380153ec-1faa-4359-b558-28119edef2ad
@@ -2356,13 +2440,14 @@ version = "3.5.0+0"
 # ╟─c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 # ╠═8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 # ╠═0b47f501-95fe-48ca-9627-8db4c764e2e3
-# ╠═4a9df9d5-6303-43c4-8f56-a6aab0dfb083
-# ╠═21e6a494-31fe-4479-b826-d6ceca538b62
+# ╠═dd97d9ee-c755-4bdc-86fd-58cebbb638f1
+# ╠═bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
+# ╟─e339ad29-f74f-4c3c-be0c-e28c67d920a3
+# ╟─b836b38e-b90e-4e7b-99fd-4c8eedf88676
+# ╠═f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
 # ╠═528cc8ca-63b0-47fc-ac29-92f25e04224a
 # ╠═347f6868-6db2-4ba7-b672-b996e71b4b5b
 # ╠═f526f24c-0e69-4cfe-9cc7-cc9ec60bc9f1
-# ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
 # ╠═0da70997-abca-4d2a-96d7-9800e75cffbf
-# ╠═45e9a193-ddb8-4f42-843a-adfca5da4131
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
