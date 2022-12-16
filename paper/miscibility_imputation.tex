@@ -1,0 +1,91 @@
+\documentclass[11pt, oneside]{article}  
+\usepackage{geometry}  
+% \usepackage{nunito}
+\usepackage{cmbright}
+\geometry{letterpaper}   
+\usepackage{cite}
+\usepackage{graphicx}				% Use pdf, png, jpg, or eps§ with pdflatex; use eps in DVI mode
+								% TeX will automatically convert eps --> pdf in pdflatex	
+\usepackage{tcolorbox}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{color}
+\definecolor{c1}{rgb}{0.12, 0.56, 1.0}
+%SetFonts
+\usepackage{xspace}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{authblk} 
+
+\definecolor{fruitpushorange}{RGB}{255, 127, 0}
+
+\usepackage{soul}
+\DeclareRobustCommand{\cms}[1]{ {\begingroup\sethlcolor{fruitpushorange}\hl{(cms:) #1}\endgroup} }
+%SetFonts
+
+
+\title{Data-driven imputation of compound miscibility via matrix factorization with graph regularization}
+\author[1]{Diba Behnoudfar}
+\author[1,$\dagger$]{Cory M. Simon}
+\author[2,*]{Joshua Schrier}
+\affil[1]{School of Chemical, Biological, and Environmental Engineering. Oregon State University. Corvallis, OR. USA. }
+\affil[2]{Department of Chemistry, Fordham University, The Bronx, New York 10458, USA}
+\affil[$\dagger$]{\texttt{cory.simon@oregonstate.edu}} 
+\affil[*]{\texttt{jschrier@fordham.edu}}
+
+%\affil[*]{}
+\date{}							% Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+
+\section{Introduction}
+
+\cite{shu2022robust}
+
+\section{Results}
+\subsection{The pairwise compound miscibility matrix}
+\subsubsection{Simulating incomplete experiments}
+
+\subsection{Problem setup: data imputation leveraging compound features}
+
+\subsection{Graph-regularized matrix factorization}
+
+\subsubsection{Training}
+
+\subsubsection{Hyperparameter tuning}
+
+\subsection{Miscibility imputation performance}
+
+\begin{figure}[h!]
+	\caption{Problem setup. (a) The incomplete miscibility matrix. (b) The class distribution.}
+\end{figure}
+
+\begin{figure}[h!]
+	\caption{The effect of graph regularization on the model. 3 $\times$ 3 panel with various $\lambda$ and $\gamma$?}
+\end{figure}
+
+\begin{figure}[h!]
+	\caption{The optimal model. (a) Latent space of compounds. (b) Confusion matrix on test data.}
+\end{figure}
+
+\begin{figure}[h!]
+	\caption{Effect of data sparsity on missing value imputation.}
+\end{figure}
+
+features vs class only?
+
+
+
+\bibliography{refs}
+\bibliographystyle{unsrt}
+
+\end{document}  
