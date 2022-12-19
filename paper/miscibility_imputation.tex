@@ -51,39 +51,96 @@
 
 \cite{shu2022robust}
 
+\section{Problem setup: imputing compound miscibility, leveraging compound features}
+
+\section{Graph-regularized matrix factorization for imputing compound miscibility}
+
+\subsection{The data}
+data: $\{ m_{ij} \}_{(i, j) \in \Omega_{\text{obs}}}$ where $m_{ij}\in\{0, 1\}$ is the miscibility of compound $i$ and $j$ (0: immiscible, 1: miscible).
+The set $\Omega_\text{obs} \subset \{1,..n\} \times \{1, ..., n\}$ is the set of observed tuples.
+
+\subsection{The miscibility model}
+$c_i \in \mathbb{R}^k$: latent vector representation of compound $i$.
+
+model
+\begin{equation}
+	m_{ij} \approx \sigma(c_i \cdot c_j + b)
+\end{equation}
+
+\subsection{Training}
+
+loss:
+
+\begin{multline}
+	\ell(C, b) = - \displaystyle \sum_{(i, j) \in \Omega_{\text{obs}}} \left[ m_{ij} \log \left(\sigma(c_i \cdot c_j+b)\right) + (1-m_{ij}) \log \left(1-\sigma(c_i \cdot c_j+b)\right)  \right] \\
+	+ \lambda \displaystyle\sum_{i=1}^n \lvert \lvert c_i \rvert \rvert^2 + \gamma  \displaystyle \sum_{(i, j)} k(i, j) \lvert \lvert c_i - c_j \rvert \rvert^2
+\end{multline}
+
+gradients
+
+\subsection{Hyperparameter tuning}
+parameters: 
+\begin{itemize}	
+	\item latent compound vectors, $C$
+	\item bias, $b$
+\end{itemize}
+hyperparameters:
+\begin{itemize}	
+	\item dimension of latent space, $k$ 
+	\item compound vector regularization param, $\lambda$
+	\item graph-regularization param, $\gamma$
+	\item (if features) the bandwidth of the kernel parameter
+\end{itemize}
+
+
 \section{Results}
-\subsection{The pairwise compound miscibility matrix}
-\subsubsection{Simulating incomplete experiments}
 
-\subsection{Problem setup: data imputation leveraging compound features}
+\subsection{Simulating incomplete experiments to generate incomplete miscibility matrix}
 
-\subsection{Graph-regularized matrix factorization}
+\subsection{A typical outcome}
+\subsubsection{The pairwise compound miscibility matrix}
 
-\subsubsection{Training}
+\subsubsection{Training and hyper-parameter tuning}
 
-\subsubsection{Hyperparameter tuning}
+\subsubsection{The latent space of compounds}
+\subsubsection{Miscibility imputation performance}
 
-\subsection{Miscibility imputation performance}
-
-\begin{figure}[h!]
-	\caption{Problem setup. (a) The incomplete miscibility matrix. (b) The class distribution.}
-\end{figure}
-
-\begin{figure}[h!]
-	\caption{The effect of graph regularization on the model. 3 $\times$ 3 panel with various $\lambda$ and $\gamma$?}
-\end{figure}
-
-\begin{figure}[h!]
-	\caption{The optimal model. (a) Latent space of compounds. (b) Confusion matrix on test data.}
-\end{figure}
-
-\begin{figure}[h!]
-	\caption{Effect of data sparsity on missing value imputation.}
-\end{figure}
-
-features vs class only?
+\subsubsection{Comparisons: with, without graph regularization}
+  \begin{itemize}
+   \item vanilla matrix factorization ($\gamma=0$) vs.\ graph-regularized matrix factorization $\gamma > 0$.
+   \item class-only $k(i,j)$ vs.\ feature-vector-based $k(i, j)$. okay both are features. just combine?
+  \end{itemize}
 
 
+\subsection{Ensemble of performances, over different sparsities}
+
+\subsection{Baseline models}
+
+not comparable to paper b/c theirs is complete.
+
+train RF on obs data. predict on unobs data.
+
+idea 1: train one RF per compound. 
+
+idea 2: train RF, input = concat two compound features, then data augmentation to impose permutation invariance. need to do class weights to handle their resampling. 
+
+random baseline (guessing), with proportion in training data.
+
+\section{convo with Joshua, Dec 19}
+kernels that can handle missing data?
+
+scan hyperparams: (a) keep $\lambda$, $k$ set same, randomly selected or (b) scan grid.
+
+if we generate enuff numbers, then ok...
+
+p-value/hypothesis test. for random choice of hyper-params. which model does better?
+
+Joshua likes class-only. then don't need to find the features and do imputation. 
+
+
+
+
+uncertainty quantification via bootstrap?
 
 \bibliography{refs}
 \bibliographystyle{unsrt}
