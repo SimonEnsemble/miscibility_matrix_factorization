@@ -175,7 +175,6 @@ end
 function kernel_matrix(σ::Float64)
 	kernel = σ*SqExponentialKernel() 
 	
-	
 	K = zeros(n_compounds, n_compounds)
 	for i = 1:n_compounds
 		for j = 1:n_compounds
@@ -263,9 +262,6 @@ end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
 data = sim_data_collection(0.6, M_complete)
-
-# ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
-any(ismissing.(data.M))
 
 # ╔═╡ 4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
 viz_miscibility_matrix(data.M)
@@ -469,11 +465,6 @@ ie. a random forest"
 
 # ╔═╡ 37a9df7d-8450-427d-8f33-6471a5cdb262
 function build_Xy(data::MiscibilityData, feature_matrix::Array{Float64, 2})
-	# # nb of observed pairs. 
-	# nb_train = length(data.ids_obs)
-	# # nb of features
-	# nb_features = size(feature_matrix)[2]
-	# # build feature matrix, which is pairs of compounds
 	X_train = []
 	y_train = []
 	X_test = []
@@ -504,7 +495,7 @@ function build_Xy(data::MiscibilityData, feature_matrix::Array{Float64, 2})
 end
 
 # ╔═╡ 045cec66-e788-4fb1-80ad-c44ce072a88d
-function train_test_baseline_model(
+function test_perf_baseline_model(
 	data::MiscibilityData, 
 	feature_matrix::Matrix{Float64}
 )
@@ -542,10 +533,10 @@ end
 compute_perf_metrics(model, data, data.ids_missing)
 
 # ╔═╡ c3e18c21-2766-4a7f-aede-053556565621
-train_test_baseline_model(data, feature_matrix)
+test_perf_baseline_model(data, feature_matrix)
 
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
-ngrid = 1
+ngrid = 10
 
 # ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
 function do_hyperparam_optimization(
@@ -601,7 +592,7 @@ function do_hyperparam_optimization(
 end
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
-cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=rand())
+cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
 				   for _ = 1:ngrid]
 
 # ╔═╡ 434193a3-3b06-494d-b7db-09f152ad437f
@@ -681,6 +672,9 @@ function compute_cm(model::Model, data::MiscibilityData)
 	cm = confusion_matrix(m, m̂)
 end
 
+# ╔═╡ 0db50820-15f2-4480-8efc-6e22f3b73f6c
+cm = compute_cm(opt_model, data)
+
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
 	cm_to_plot = reverse(cm, dims=1)'
@@ -708,22 +702,20 @@ function viz_confusion(cm::Matrix)
 	return fig
 end
 
-# ╔═╡ 4edc1e98-24b6-4cc0-823e-db7137e9ac9a
-cory = 5.0
-
-# ╔═╡ a6e3639c-3974-4556-8f45-7fc69a1cd426
-function eraser(x)
-	cory = 6.0
-end
-
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
 viz_confusion(cm) # TODO compare to random guessing
 
+# ╔═╡ af3aab8a-ad59-438f-95f0-4fda1a894f27
+md"performance metrics."
+
+# ╔═╡ 3009cdd6-90b3-4262-bde8-2623e217273b
+test_perf_baseline_model(data, feature_matrix)
+
+# ╔═╡ dc02c325-d493-4bda-acf9-72e41e634dcf
+compute_perf_metrics(opt_model, data, data.ids_missing)
+
 # ╔═╡ 0fd7342c-a459-40dc-9fd8-c8b1d8103c61
 md"plot distribution of predictions on test data"
-
-# ╔═╡ 380153ec-1faa-4359-b558-28119edef2ad
-
 
 # ╔═╡ 258a1618-997e-4ba6-a315-4a679a3ba22d
 function viz_preds_on_test(model)
@@ -742,12 +734,6 @@ end
 
 # ╔═╡ d508d3f9-ac1a-463b-9930-aa403df25558
 viz_preds_on_test(model)
-
-# ╔═╡ 8d664f82-2436-4f6a-9769-f468a1828d6d
-M_complete
-
-# ╔═╡ 69ae7968-e6a7-46e7-8506-f0ea2b30e047
-data.ids_missing
 
 # ╔═╡ c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 md"## big function"
@@ -788,8 +774,13 @@ function run_experiment(θ::Float64;
 	# confusion matrix on test
 	cm = compute_cm(opt_model, data)
 
+	# baseline model
+	baseline_perf_metrics = test_perf_baseline_model(data, feature_matrix)
+
 	return (data=data, opt_model=opt_model, perf_metrics=perf_metrics, 
-		    opt_hyperparams=opt_hyperparams, fig_losses=fig_losses, cm=cm)
+		    opt_hyperparams=opt_hyperparams, fig_losses=fig_losses, cm=cm,
+		    baseline_perf_metrics=baseline_perf_metrics
+	)
 end
 
 # ╔═╡ 0b47f501-95fe-48ca-9627-8db4c764e2e3
@@ -2438,7 +2429,6 @@ version = "3.5.0+0"
 # ╠═22531e96-f0f7-45c0-a327-53094a83ddcf
 # ╠═01890165-4cb1-4917-959d-9a0c28e60073
 # ╠═9b0388ac-a640-4ffa-8531-b1ae7b68393f
-# ╠═8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 # ╠═acf912f1-51cf-4943-8964-c51cc3bf3427
 # ╠═3a6f1f39-b598-4ce2-8858-b17551133bfe
 # ╟─3153dd82-8be6-4683-b93d-9629c3d3312f
@@ -2490,16 +2480,15 @@ version = "3.5.0+0"
 # ╠═d39f41a6-e48e-40b7-8929-f62d8ce22a2f
 # ╠═b93b5880-3a89-4028-a2dc-b93d5c6b138d
 # ╠═80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
+# ╠═0db50820-15f2-4480-8efc-6e22f3b73f6c
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
-# ╠═4edc1e98-24b6-4cc0-823e-db7137e9ac9a
-# ╠═a6e3639c-3974-4556-8f45-7fc69a1cd426
 # ╠═35666424-d5dc-4a2f-a650-3241a0952c07
+# ╟─af3aab8a-ad59-438f-95f0-4fda1a894f27
+# ╠═3009cdd6-90b3-4262-bde8-2623e217273b
+# ╠═dc02c325-d493-4bda-acf9-72e41e634dcf
 # ╟─0fd7342c-a459-40dc-9fd8-c8b1d8103c61
-# ╠═380153ec-1faa-4359-b558-28119edef2ad
 # ╠═258a1618-997e-4ba6-a315-4a679a3ba22d
 # ╠═d508d3f9-ac1a-463b-9930-aa403df25558
-# ╠═8d664f82-2436-4f6a-9769-f468a1828d6d
-# ╠═69ae7968-e6a7-46e7-8506-f0ea2b30e047
 # ╟─c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 # ╠═8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 # ╠═0b47f501-95fe-48ca-9627-8db4c764e2e3
