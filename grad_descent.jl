@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.16
+# v0.19.19
 
 using Markdown
 using InteractiveUtils
@@ -24,6 +24,9 @@ import MLJBase: partition, StratifiedCV, train_test_pairs
 
 # ╔═╡ 9cf628c4-3194-423a-90fc-94bb46c25450
 @sk_import metrics: (confusion_matrix, accuracy_score, f1_score, precision_score, recall_score)
+
+# ╔═╡ bc40186a-b0b2-43ba-8ef1-60da7a304aae
+@sk_import ensemble: RandomForestClassifier
 
 # ╔═╡ 5df72253-8573-46e9-a21b-923e0ce3f360
 @sk_import decomposition: PCA
@@ -249,6 +252,7 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64}; seed::Int=9
 	for i = 1:n_compounds
 		M[i, i] = 1
 	end
+	@assert length(ids_obs) * 2 + n_compounds == sum(.! ismissing.(M))
 
 	# to down-weigh the majority class
 	fraction_miscible = mean([M[i, j] for (i, j) in ids_obs])
@@ -258,7 +262,7 @@ function sim_data_collection(θ::Float64, M_complete::Matrix{Int64}; seed::Int=9
 end
 
 # ╔═╡ 35e3ff6c-7e08-4956-b6d2-e9c6b8b076c6
-data = sim_data_collection(0.5, M_complete)
+data = sim_data_collection(0.6, M_complete)
 
 # ╔═╡ 8deb8f6f-2be0-4c48-bf2b-4bf2e391c5c1
 any(ismissing.(data.M))
@@ -458,6 +462,65 @@ end
 # ╔═╡ 0ede5258-7b6a-4975-8d6b-65639bb7ac74
 viz_loss(losses)
 
+# ╔═╡ f6774107-4b4f-4054-9afe-c73226aac371
+md"### _baseline_ model
+
+ie. a random forest"
+
+# ╔═╡ 37a9df7d-8450-427d-8f33-6471a5cdb262
+function build_Xy(data::MiscibilityData, feature_matrix::Array{Float64, 2})
+	# # nb of observed pairs. 
+	# nb_train = length(data.ids_obs)
+	# # nb of features
+	# nb_features = size(feature_matrix)[2]
+	# # build feature matrix, which is pairs of compounds
+	X_train = []
+	y_train = []
+	X_test = []
+	y_test = []
+	# loop over pairs. be sure to repeat. 
+	# this is important to capture permutation-invariance
+	for i = 1:data.n_compounds
+		for j = 1:data.n_compounds
+			if i == j
+				continue
+			end
+			# build feature vector for this compound pair.
+			x_ij = vcat(feature_matrix[i, :], feature_matrix[j, :])
+			y_ij = M_complete[i, j]
+			
+			if ! ismissing(data.M[i, j])
+				push!(X_train, x_ij)
+				push!(y_train, y_ij)
+			else
+				push!(X_test, x_ij)
+				push!(y_test, y_ij)
+			end
+		end
+	end
+	@assert length(data.ids_obs) * 2 == length(y_train)
+	@assert length(data.ids_missing) * 2 == length(y_test)
+	return X_train, y_train, X_test, y_test
+end
+
+# ╔═╡ 045cec66-e788-4fb1-80ad-c44ce072a88d
+function train_test_baseline_model(
+	data::MiscibilityData, 
+	feature_matrix::Matrix{Float64}
+)
+	X_train, y_train, X_test, y_test = build_Xy(data, feature_matrix)
+
+	rf = RandomForestClassifier()
+	rf.fit(X_train, y_train)
+	ŷ_test = rf.predict(X_test)
+
+	return (f1=f1_score(y_test, ŷ_test),
+		    accuracy=accuracy_score(y_test, ŷ_test),
+	        precision=precision_score(y_test, ŷ_test),
+		    recall=recall_score(y_test, ŷ_test)
+	)
+end
+
 # ╔═╡ c939cb70-858d-4b57-977a-693097c78499
 md"## hyperparam optimization"
 
@@ -476,13 +539,13 @@ function compute_perf_metrics(model::Model,
 end
 
 # ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
-compute_perf_metrics(model, data, data.ids_missing)[:f1]
+compute_perf_metrics(model, data, data.ids_missing)
 
-# ╔═╡ 5efedaad-892f-4005-8ea2-27ce5b3fd7d8
-perf_metrics
+# ╔═╡ c3e18c21-2766-4a7f-aede-053556565621
+train_test_baseline_model(data, feature_matrix)
 
 # ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
-ngrid = 10
+ngrid = 1
 
 # ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
 function do_hyperparam_optimization(
@@ -653,9 +716,6 @@ function eraser(x)
 	cory = 6.0
 end
 
-# ╔═╡ 0fb063c6-ff71-4b7b-9ae0-e4022443f046
-
-
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
 viz_confusion(cm) # TODO compare to random guessing
 
@@ -809,7 +869,7 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.2"
+julia_version = "1.8.5"
 manifest_format = "2.0"
 project_hash = "f04ffbe296aafabf7e2bb56bdfc5a5d72b2e1daa"
 
@@ -906,7 +966,7 @@ uuid = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 version = "0.10.0"
 
 [[deps.Cairo_jll]]
-deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
+deps = ["Artifacts", "Bzip2_jll", "CompilerSupportLibraries_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
 uuid = "83423d85-b0ee-5818-9007-b63ccbeb887a"
 version = "1.16.1+1"
@@ -986,7 +1046,7 @@ version = "4.5.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.5.2+0"
+version = "1.0.1+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "455419f7e328a1a2493cabc6428d79e951349769"
@@ -2364,6 +2424,7 @@ version = "3.5.0+0"
 # ╠═b683bdc4-9956-4176-9c03-bebf15d0243e
 # ╠═57a6f607-cd48-4e57-a452-06e0fcdd435c
 # ╠═9cf628c4-3194-423a-90fc-94bb46c25450
+# ╠═bc40186a-b0b2-43ba-8ef1-60da7a304aae
 # ╠═5df72253-8573-46e9-a21b-923e0ce3f360
 # ╠═cabd0924-cae4-4992-bf49-92353aeea388
 # ╠═adb50317-7042-4894-8f2a-e9f6505adcfe
@@ -2411,11 +2472,14 @@ version = "3.5.0+0"
 # ╠═1a178491-815e-49e3-b423-832a24abdba9
 # ╠═3f1084c4-28f8-4f0d-98b8-2a0426c89e18
 # ╠═0ede5258-7b6a-4975-8d6b-65639bb7ac74
+# ╟─f6774107-4b4f-4054-9afe-c73226aac371
+# ╠═37a9df7d-8450-427d-8f33-6471a5cdb262
+# ╠═045cec66-e788-4fb1-80ad-c44ce072a88d
 # ╟─c939cb70-858d-4b57-977a-693097c78499
 # ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
 # ╠═92cd854b-fb84-4981-ba8e-b24ecd1509c7
 # ╠═53349731-ff98-4ed7-9877-fe8cf389e6e3
-# ╠═5efedaad-892f-4005-8ea2-27ce5b3fd7d8
+# ╠═c3e18c21-2766-4a7f-aede-053556565621
 # ╠═9eef7d3f-a121-41ff-828b-042910b56789
 # ╠═53987486-ed22-424e-b744-6033ac4be4c6
 # ╠═434193a3-3b06-494d-b7db-09f152ad437f
@@ -2429,7 +2493,6 @@ version = "3.5.0+0"
 # ╠═976e29ae-393a-48df-9dc2-e393af5dcc7a
 # ╠═4edc1e98-24b6-4cc0-823e-db7137e9ac9a
 # ╠═a6e3639c-3974-4556-8f45-7fc69a1cd426
-# ╠═0fb063c6-ff71-4b7b-9ae0-e4022443f046
 # ╠═35666424-d5dc-4a2f-a650-3241a0952c07
 # ╟─0fd7342c-a459-40dc-9fd8-c8b1d8103c61
 # ╠═380153ec-1faa-4359-b558-28119edef2ad
