@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.19
+# v0.19.9
 
 using Markdown
 using InteractiveUtils
@@ -437,10 +437,16 @@ end
 hyperparams = (k=2, γ=0.01, λ=.5, σ=0.1)
 
 # ╔═╡ 660f9ba7-871a-43df-b69d-d792a8e75456
+# ╠═╡ disabled = true
+#=╠═╡
 nb_epochs = 1000
+  ╠═╡ =#
 
 # ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
+# ╠═╡ disabled = true
+#=╠═╡
 model, losses = construct_train_model(hyperparams, data, nb_epochs) # just an example
+  ╠═╡ =#
 
 # ╔═╡ 1a178491-815e-49e3-b423-832a24abdba9
 function _viz_loss!(ax, losses::Vector{Float64})
@@ -456,7 +462,10 @@ function viz_loss(losses::Vector{Float64})
 end
 
 # ╔═╡ 0ede5258-7b6a-4975-8d6b-65639bb7ac74
+# ╠═╡ disabled = true
+#=╠═╡
 viz_loss(losses)
+  ╠═╡ =#
 
 # ╔═╡ f6774107-4b4f-4054-9afe-c73226aac371
 md"### _baseline_ model
@@ -529,20 +538,13 @@ function compute_perf_metrics(model::Model,
 	)
 end
 
-# ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
-compute_perf_metrics(model, data, data.ids_missing)
-
-# ╔═╡ c3e18c21-2766-4a7f-aede-053556565621
-test_perf_baseline_model(data, feature_matrix)
-
-# ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
-ngrid = 10
-
 # ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
 function do_hyperparam_optimization(
 	data::MiscibilityData,
 	cv_hyperparams::Vector{<:NamedTuple};
 	nfolds::Int=3,
+	ngrid::Int,
+	nb_epochs::Int,
 	type_of_perf_metric::Symbol=:f1
 )
 	# cross-validation split
@@ -591,12 +593,34 @@ function do_hyperparam_optimization(
 	return perf_metrics, opt_hyperparams, fig_losses
 end
 
+# ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
+# ╠═╡ disabled = true
+#=╠═╡
+compute_perf_metrics(model, data, data.ids_missing)
+  ╠═╡ =#
+
+# ╔═╡ c3e18c21-2766-4a7f-aede-053556565621
+# ╠═╡ disabled = true
+#=╠═╡
+test_perf_baseline_model(data, feature_matrix)
+  ╠═╡ =#
+
+# ╔═╡ 9eef7d3f-a121-41ff-828b-042910b56789
+# ╠═╡ disabled = true
+#=╠═╡
+ngrid = 10
+  ╠═╡ =#
+
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
+#=╠═╡
 cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
 				   for _ = 1:ngrid]
+  ╠═╡ =#
 
 # ╔═╡ 434193a3-3b06-494d-b7db-09f152ad437f
+#=╠═╡
 perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams)
+  ╠═╡ =#
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -612,7 +636,9 @@ and repeat with and without graph regularization.
 "
 
 # ╔═╡ 2ccfb38a-4205-429d-9edc-76a20082d735
+#=╠═╡
 opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
+  ╠═╡ =#
 
 # ╔═╡ 1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 class_to_marker = Dict("Polymer"    => :circle, 
@@ -624,6 +650,7 @@ class_to_marker = Dict("Polymer"    => :circle,
 class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.Accent_4))
 
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
+#=╠═╡
 function viz_latent_space(model::Model)
 	do_pca = size(model.C)[1] != 2
 	
@@ -659,9 +686,12 @@ function viz_latent_space(model::Model)
 	axislegend()
 	return fig
 end
+  ╠═╡ =#
 
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
+#=╠═╡
 viz_latent_space(opt_model)
+  ╠═╡ =#
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 # on tests data
@@ -673,7 +703,10 @@ function compute_cm(model::Model, data::MiscibilityData)
 end
 
 # ╔═╡ 0db50820-15f2-4480-8efc-6e22f3b73f6c
+# ╠═╡ disabled = true
+#=╠═╡
 cm = compute_cm(opt_model, data)
+  ╠═╡ =#
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
@@ -703,16 +736,24 @@ function viz_confusion(cm::Matrix)
 end
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
+# ╠═╡ disabled = true
+#=╠═╡
 viz_confusion(cm) # TODO compare to random guessing
+  ╠═╡ =#
 
 # ╔═╡ af3aab8a-ad59-438f-95f0-4fda1a894f27
 md"performance metrics."
 
 # ╔═╡ 3009cdd6-90b3-4262-bde8-2623e217273b
+# ╠═╡ disabled = true
+#=╠═╡
 test_perf_baseline_model(data, feature_matrix)
+  ╠═╡ =#
 
 # ╔═╡ dc02c325-d493-4bda-acf9-72e41e634dcf
+#=╠═╡
 compute_perf_metrics(opt_model, data, data.ids_missing)
+  ╠═╡ =#
 
 # ╔═╡ 0fd7342c-a459-40dc-9fd8-c8b1d8103c61
 md"plot distribution of predictions on test data"
@@ -733,7 +774,9 @@ function viz_preds_on_test(model)
 end
 
 # ╔═╡ d508d3f9-ac1a-463b-9930-aa403df25558
+#=╠═╡
 viz_preds_on_test(model)
+  ╠═╡ =#
 
 # ╔═╡ c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 md"## big function"
@@ -753,7 +796,7 @@ function run_experiment(θ::Float64;
 	# create list of hyperparams to explore.
 	Random.seed!(seed)
 	cv_hyperparams = [
-		(k = rand([2, 3, 4, 5]), 
+		(k = rand([2, 3, 4, 5]),
 		 γ = graph_regularization ? rand(Uniform(0, 0.1)) : 0.0, 
 		 λ = rand(), 
 		 σ = class_kernel ? nothing : rand(Uniform(1e-1, 2))
@@ -762,7 +805,8 @@ function run_experiment(θ::Float64;
 
 	# conduct hyper-param optimization viz K-folds cross validation on training data
 	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(
-		          data, cv_hyperparams, nfolds=nfolds)
+		          data, cv_hyperparams, nfolds=nfolds, ngrid=ngrid, 
+					    nb_epochs=nb_epochs)
 
 	# train deployment model on all training data with opt hyper-params
 	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
@@ -784,13 +828,27 @@ function run_experiment(θ::Float64;
 end
 
 # ╔═╡ 0b47f501-95fe-48ca-9627-8db4c764e2e3
-results_class_kernel = run_experiment(0.5, class_kernel=true)
+# ╠═╡ disabled = true
+#=╠═╡
+results_class_kernel = run_experiment(0.5, class_kernel=true, ngrid=10)
+  ╠═╡ =#
+
+# ╔═╡ 29610d86-1bef-461a-a243-d53a1e080e84
+#=╠═╡
+results_class_kernel.perf_metrics
+  ╠═╡ =#
 
 # ╔═╡ dd97d9ee-c755-4bdc-86fd-58cebbb638f1
+# ╠═╡ disabled = true
+#=╠═╡
 viz_confusion(results_class_kernel.cm)
+  ╠═╡ =#
 
 # ╔═╡ bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
+# ╠═╡ disabled = true
+#=╠═╡
 results_features = run_experiment(0.5, class_kernel=false)
+  ╠═╡ =#
 
 # ╔═╡ e339ad29-f74f-4c3c-be0c-e28c67d920a3
 md"show confusion matrix and similarity matrix and clustering for a _typical_ example (median F1 score)"
@@ -799,7 +857,47 @@ md"show confusion matrix and similarity matrix and clustering for a _typical_ ex
 md"bar plot of recall, acc, pre, rec over 10 runs"
 
 # ╔═╡ f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
+function generate_comparison_data(θ::Float64;
+				  		          nruns::Int=10,
+				                  ngrid::Int=10
+)
+	runs = DataFrame(f1=Any[],accuracy=Any[],precision=Any[],recall=Any[],model=Any[])
 
+	
+	
+	for i=1:nruns
+		results_class_kernel = run_experiment(θ, class_kernel=true, ngrid=ngrid)
+		x = results_class_kernel.perf_metrics.test...,(model="class_kernel")
+		push!(runs, x)
+		results_features = run_experiment(θ, class_kernel=false, ngrid=ngrid)
+		x = results_features.perf_metrics.test...,(model="features_kernel")
+		push!(runs, x)
+		#results_rf = test_perf_baseline_model(data, feature_matrix)
+		results_no_kernel = run_experiment(θ, graph_regularization=false, ngrid=ngrid)
+		x = results_no_kernel.perf_metrics.test...,(model="no_kernel")
+		push!(runs, x)
+		x=results_features.baseline_perf_metrics...,(model="rf")
+		push!(runs, x)
+	end
+
+	CSV.write("runs.csv", runs)
+	
+	return runs
+	
+end	
+	
+
+# ╔═╡ 5b859917-eab2-48db-834e-72bcfb207907
+# ╠═╡ disabled = true
+#=╠═╡
+class_kernel = run_experiment(.5, class_kernel=true, ngrid=2)
+  ╠═╡ =#
+
+# ╔═╡ ec5b028d-d892-40e4-b1a6-58464d160543
+# ╠═╡ disabled = true
+#=╠═╡
+runs_theta05 = generate_comparison_data(0.5)
+  ╠═╡ =#
 
 # ╔═╡ 528cc8ca-63b0-47fc-ac29-92f25e04224a
 # ╠═╡ disabled = true
@@ -860,9 +958,8 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.5"
+julia_version = "1.7.3"
 manifest_format = "2.0"
-project_hash = "f04ffbe296aafabf7e2bb56bdfc5a5d72b2e1daa"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -901,7 +998,6 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -1037,7 +1133,6 @@ version = "4.5.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.1+0"
 
 [[deps.CompositionsBase]]
 git-tree-sha1 = "455419f7e328a1a2493cabc6428d79e951349769"
@@ -1138,7 +1233,6 @@ version = "0.9.3"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -1525,12 +1619,10 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1539,7 +1631,6 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1675,7 +1766,6 @@ version = "0.5.4"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.0+0"
 
 [[deps.MiniQhull]]
 deps = ["QhullMiniWrapper_jll"]
@@ -1700,7 +1790,6 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1716,7 +1805,6 @@ version = "1.1.0"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
-version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
@@ -1738,7 +1826,6 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1755,7 +1842,6 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1783,7 +1869,6 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1836,7 +1921,6 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -1975,7 +2059,6 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
-version = "0.7.0"
 
 [[deps.SIMD]]
 git-tree-sha1 = "bc12e315740f3a36a6db85fa2c0212a848bd239e"
@@ -2158,7 +2241,6 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -2175,7 +2257,6 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -2329,7 +2410,6 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.12+3"
 
 [[deps.ZygoteRules]]
 deps = ["MacroTools"]
@@ -2358,7 +2438,6 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2387,12 +2466,10 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2492,11 +2569,14 @@ version = "3.5.0+0"
 # ╟─c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 # ╠═8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 # ╠═0b47f501-95fe-48ca-9627-8db4c764e2e3
+# ╠═29610d86-1bef-461a-a243-d53a1e080e84
 # ╠═dd97d9ee-c755-4bdc-86fd-58cebbb638f1
 # ╠═bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
 # ╟─e339ad29-f74f-4c3c-be0c-e28c67d920a3
 # ╟─b836b38e-b90e-4e7b-99fd-4c8eedf88676
 # ╠═f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
+# ╠═5b859917-eab2-48db-834e-72bcfb207907
+# ╠═ec5b028d-d892-40e4-b1a6-58464d160543
 # ╠═528cc8ca-63b0-47fc-ac29-92f25e04224a
 # ╠═347f6868-6db2-4ba7-b672-b996e71b4b5b
 # ╠═f526f24c-0e69-4cfe-9cc7-cc9ec60bc9f1
