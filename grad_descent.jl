@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.9
+# v0.19.19
 
 using Markdown
 using InteractiveUtils
@@ -441,13 +441,11 @@ end
 hyperparams = (k=2, γ=0.01, λ=.5, σ=0.1)
 
 # ╔═╡ 660f9ba7-871a-43df-b69d-d792a8e75456
-# ╠═╡ disabled = true
 #=╠═╡
 nb_epochs = 1000
   ╠═╡ =#
 
 # ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
-# ╠═╡ disabled = true
 #=╠═╡
 model, losses = construct_train_model(hyperparams, data, nb_epochs) # just an example
   ╠═╡ =#
@@ -863,10 +861,11 @@ md"show confusion matrix and similarity matrix and clustering for a _typical_ ex
 md"bar plot of recall, acc, pre, rec over 10 runs"
 
 # ╔═╡ f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
-function generate_comparison_data(data::MiscibilityData;
-				  		          nruns::Int=10,
-				                  ngrid::Int=10
-)
+## source of stochasticity over runs
+# - introducing missing values
+# - cross-validation procedure
+# - different hyperparam options
+function generate_comparison_data(θ::Float64; nruns::Int=10, ngrid::Int=10)
 	perf_data = DataFrame()
 	all_metrics = [:f1, :accuracy, :precision, :recall]
 	
@@ -874,14 +873,14 @@ function generate_comparison_data(data::MiscibilityData;
 		### simulate data collection
 		# introduce missing values into the matrix.
 		# important to keep data the same for comparison.
-		#data = sim_data_collection(θ, M_complete)
+		data = sim_data_collection(θ, M_complete)
 		
 		### train the models.
 		# base kernel on the class
 		res = run_experiment(data, class_kernel=true, ngrid=ngrid)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="class-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=0)
+				(run=r, model="class-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=0.0)
 			)
 		end
 
@@ -889,7 +888,7 @@ function generate_comparison_data(data::MiscibilityData;
 		res = run_experiment(data, class_kernel=false, ngrid=ngrid)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="feature-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=0)
+				(run=r, model="feature-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=res.opt_hyperparams.σ)
 			)
 		end
 
@@ -897,7 +896,7 @@ function generate_comparison_data(data::MiscibilityData;
 		res = run_experiment(data, graph_regularization=false, ngrid=ngrid)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="no graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=0,λ=res.opt_hyperparams.λ,σ=0)
+				(run=r, model="no graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=0.0,λ=res.opt_hyperparams.λ,σ=0.0)
 			)
 		end
 		
@@ -905,38 +904,67 @@ function generate_comparison_data(data::MiscibilityData;
 		res = test_perf_baseline_model(data, feature_matrix)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="random forest", score=res[met], metric=String(met), k=0,γ=0,λ=0,σ=0)
+				(run=r, model="random forest", score=res[met], metric=String(met), k=0.0,γ=0.0,λ=0.0,σ=0.0)
 			)
 		end
 	end
 	return perf_data
 end
 
-# ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
-# ╠═╡ disabled = true
-#=╠═╡
-perf_data = generate_comparison_data(data, nruns=10, ngrid=10)
-  ╠═╡ =#
+# ╔═╡ 762096d7-b7bc-4058-9661-4bd103fb537e
+md"## analyze performance over different $\theta$"
 
-# ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
-#=╠═╡
-CSV.write("runs_theta05.csv", perf_data)
-  ╠═╡ =#
+# ╔═╡ 02e3e27e-bea5-41fa-b532-2d87cff4bc58
+begin
+	θs = [0.3, 0.6, 0.9]
+	perfs = []
+	for θ in θs
+		push!(perfs,
+			generate_comparison_data(θ, nruns=3, ngrid=1)
+		)
+	end
+end
 
 # ╔═╡ 1c9df16c-36f6-4602-b6fd-89fc5349f12f
 import Gadfly
 
 # ╔═╡ cea202fe-fd6f-4832-88bf-60904846d73f
-#=╠═╡
-Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
-    # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
-    Gadfly.Geom.boxplot,
-	Gadfly.Guide.title("θ = $(data.θ)")
-	# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
-    # Guide.colorkey(title="", pos=[0.78w,-0.4h])
-	# title: θ.
-)
-  ╠═╡ =#
+function viz_perf(perf::DataFrame, θ::Float64)
+	return Gadfly.plot(perf, x=:metric, y=:score, color=:model,
+	    # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
+	    Gadfly.Geom.boxplot,
+		Gadfly.Guide.title("θ = $(data.θ)")
+		# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
+	    # Guide.colorkey(title="", pos=[0.78w,-0.4h])
+		# title: θ.
+	)
+end
+
+# ╔═╡ ee88642b-d5d0-4d8d-970d-29b20c2862fa
+function viz_hyperparams(perf::DataFrame, param::Symbol)
+	fig = Figure()
+	ax = Axis(fig[1, 1], xlabel="$param", ylabel="# sims")
+	hist!(perf[:, param])
+	fig
+end
+
+# ╔═╡ 2f569cec-5361-462b-a284-dbcd863a2dc2
+viz_perf(perfs[1], θ[1])
+
+# ╔═╡ 424b4414-6667-4968-8ede-82a64383e3fe
+viz_hyperparams(perf, :λ)
+
+# ╔═╡ ff765892-05f8-4a54-9078-80bbc9a50999
+viz_perf(perfs[2], θ[2])
+
+# ╔═╡ d32dd328-9dd2-42b9-a1b4-b8a7ca815d56
+viz_perf(perfs[3], θ[3])
+
+# ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
+perf_data = generate_comparison_data(0.6, nruns=3, ngrid=10)
+
+# ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
+CSV.write("runs_theta05.csv", perf_data)
 
 # ╔═╡ 5b859917-eab2-48db-834e-72bcfb207907
 # ╠═╡ disabled = true
@@ -1011,8 +1039,9 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.3"
+julia_version = "1.8.5"
 manifest_format = "2.0"
+project_hash = "746562f827a6b27483400c7cf0354ee8d82feb57"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1051,6 +1080,7 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
+version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -1189,6 +1219,7 @@ version = "4.5.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
+version = "1.0.1+0"
 
 [[deps.Compose]]
 deps = ["Base64", "Colors", "DataStructures", "Dates", "IterTools", "JSON", "LinearAlgebra", "Measures", "Printf", "Random", "Requires", "Statistics", "UUIDs"]
@@ -1302,6 +1333,7 @@ version = "0.8.6"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -1706,10 +1738,12 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
+version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
+version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1718,6 +1752,7 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
+version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1853,6 +1888,7 @@ version = "0.5.4"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
+version = "2.28.0+0"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -1888,6 +1924,7 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
+version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1903,6 +1940,7 @@ version = "1.1.0"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
+version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
@@ -1924,6 +1962,7 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
+version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1940,6 +1979,7 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
+version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1967,6 +2007,7 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
+version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -2019,6 +2060,7 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -2161,6 +2203,7 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+version = "0.7.0"
 
 [[deps.SIMD]]
 deps = ["SnoopPrecompile"]
@@ -2351,6 +2394,7 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
+version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -2367,6 +2411,7 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
+version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -2525,6 +2570,7 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
+version = "1.2.12+3"
 
 [[deps.ZygoteRules]]
 deps = ["MacroTools"]
@@ -2553,6 +2599,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
+version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2581,10 +2628,12 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
+version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
+version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2690,10 +2739,17 @@ version = "3.5.0+0"
 # ╟─e339ad29-f74f-4c3c-be0c-e28c67d920a3
 # ╟─b836b38e-b90e-4e7b-99fd-4c8eedf88676
 # ╠═f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
-# ╠═92ec9882-1c15-4c1b-a3dc-35e12e56495d
-# ╠═673c9ce6-62cf-4d61-a48e-8481c3daf3d5
+# ╟─762096d7-b7bc-4058-9661-4bd103fb537e
+# ╠═02e3e27e-bea5-41fa-b532-2d87cff4bc58
 # ╠═1c9df16c-36f6-4602-b6fd-89fc5349f12f
 # ╠═cea202fe-fd6f-4832-88bf-60904846d73f
+# ╠═ee88642b-d5d0-4d8d-970d-29b20c2862fa
+# ╠═2f569cec-5361-462b-a284-dbcd863a2dc2
+# ╠═424b4414-6667-4968-8ede-82a64383e3fe
+# ╠═ff765892-05f8-4a54-9078-80bbc9a50999
+# ╠═d32dd328-9dd2-42b9-a1b4-b8a7ca815d56
+# ╠═92ec9882-1c15-4c1b-a3dc-35e12e56495d
+# ╠═673c9ce6-62cf-4d61-a48e-8481c3daf3d5
 # ╠═5b859917-eab2-48db-834e-72bcfb207907
 # ╠═ec5b028d-d892-40e4-b1a6-58464d160543
 # ╠═528cc8ca-63b0-47fc-ac29-92f25e04224a
