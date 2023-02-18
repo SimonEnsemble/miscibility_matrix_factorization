@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.19
+# v0.19.9
 
 using Markdown
 using InteractiveUtils
@@ -295,6 +295,7 @@ mutable struct Model
 	γ::Float64 # regularization param for graph structure
 	λ::Float64 # regularization param on latent reps
 	σ::Union{Float64, Nothing} # scale param
+	cutoff::Float64
 end
 
 # ╔═╡ af50a2c4-d8aa-49bd-b596-39964d2d8c7e
@@ -423,7 +424,7 @@ function construct_train_model(hyperparams::NamedTuple,
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
 	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
-	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ)
+	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ, 0.5)
 
 	# compute kernel matrix. note σ can be nothing.
 	K = kernel_matrix(hyperparams.σ)
@@ -438,17 +439,13 @@ function construct_train_model(hyperparams::NamedTuple,
 end
 
 # ╔═╡ 8db228a7-bf2b-4f1e-ab7e-596b2957498f
-hyperparams = (k=2, γ=0.01, λ=.5, σ=0.1)
+#hyperparams = (k=2, γ=0.01, λ=.5, σ=0.1)
 
 # ╔═╡ 660f9ba7-871a-43df-b69d-d792a8e75456
-#=╠═╡
-nb_epochs = 1000
-  ╠═╡ =#
+#nb_epochs = 1000
 
 # ╔═╡ ba7a3de9-b37f-4c67-869b-fceb7915ffab
-#=╠═╡
-model, losses = construct_train_model(hyperparams, data, nb_epochs) # just an example
-  ╠═╡ =#
+#model, losses = construct_train_model(hyperparams, data, nb_epochs) # just an example
 
 # ╔═╡ 1a178491-815e-49e3-b423-832a24abdba9
 function _viz_loss!(ax, losses::Vector{Float64})
@@ -508,13 +505,16 @@ end
 # ╔═╡ 045cec66-e788-4fb1-80ad-c44ce072a88d
 function test_perf_baseline_model(
 	data::MiscibilityData, 
-	feature_matrix::Matrix{Float64}
+	feature_matrix::Matrix{Float64},
+	cutoff::Float64=0.5
 )
 	X_train, y_train, X_test, y_test = build_Xy(data, feature_matrix)
 
 	rf = RandomForestClassifier()
 	rf.fit(X_train, y_train)
-	ŷ_test = rf.predict(X_test)
+	prob_preds = rf.predict_proba(X_test)
+	ŷ_test = [p > cutoff for p in prob_preds[:,2]]
+	#ŷ_test = rf.predict(X_test)
 
 	return (f1=f1_score(y_test, ŷ_test),
 		    accuracy=accuracy_score(y_test, ŷ_test),
@@ -531,13 +531,25 @@ function compute_perf_metrics(model::Model,
 	                          data::MiscibilityData, 
 	                          ids::Vector{Tuple{Int, Int}})
 	m = [M_complete[i, j]            for (i, j) in ids]
-	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in ids]
+	m̂ = [pred_mᵢⱼ(model, i, j) > model.cutoff for (i, j) in ids]
 
 	return (f1=f1_score(m, m̂),
 		    accuracy=accuracy_score(m, m̂),
 	        precision=precision_score(m, m̂),
 		    recall=recall_score(m, m̂)
 	)
+end
+
+# ╔═╡ 81b10df1-8fa3-4635-8f3a-2d47d59823c5
+function set_opt_cutoff!(model::Model, data::MiscibilityData, ids::Vector{Tuple{Int, Int}})
+	cutoffs = range(0.1, 0.9, length=20)
+	f1_scores = zeros(20)
+	for (n, cutoff) in enumerate(cutoffs) 
+		model.cutoff = cutoff
+		f1_scores[n] = compute_perf_metrics(model, data, ids).f1
+	end
+
+	model.cutoff = cutoffs[argmax(f1_scores)]
 end
 
 # ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
@@ -583,6 +595,10 @@ function do_hyperparam_optimization(
 			# train model
 			cv_model, cv_losses = construct_train_model(hps, data, nb_epochs)
 			#_viz_loss!(axs[i_fold, n], cv_losses)
+
+			# find optimal cutoff
+			set_opt_cutoff!(cv_model, data, cv_train_entries)
+			
 			# evaluate on cv-test data
 			perf_metric = compute_perf_metrics(cv_model, cv_data, cv_test_entries)
 			perf_metrics[i_fold, n] = perf_metric[type_of_perf_metric]
@@ -596,23 +612,17 @@ function do_hyperparam_optimization(
 end
 
 # ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
-# ╠═╡ disabled = true
-#=╠═╡
-compute_perf_metrics(model, data, data.ids_missing)
-  ╠═╡ =#
+#compute_perf_metrics(model, data, data.ids_missing)
 
 # ╔═╡ c3e18c21-2766-4a7f-aede-053556565621
-# ╠═╡ disabled = true
-#=╠═╡
-test_perf_baseline_model(data, feature_matrix)
-  ╠═╡ =#
+#test_perf_baseline_model(data, feature_matrix)
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
-cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
-				   for _ = 1:ngrid]
+#cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
+#				   for _ = 1:ngrid]
 
 # ╔═╡ 434193a3-3b06-494d-b7db-09f152ad437f
-perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams)
+#perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams)
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -628,9 +638,7 @@ and repeat with and without graph regularization.
 "
 
 # ╔═╡ 2ccfb38a-4205-429d-9edc-76a20082d735
-#=╠═╡
-opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
-  ╠═╡ =#
+#opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
 
 # ╔═╡ 1d7cc2ed-f383-4a0b-85aa-849f3f95f983
 class_to_marker = Dict("Polymer"    => :circle, 
@@ -642,7 +650,6 @@ class_to_marker = Dict("Polymer"    => :circle,
 class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.Accent_4))
 
 # ╔═╡ d39f41a6-e48e-40b7-8929-f62d8ce22a2f
-#=╠═╡
 function viz_latent_space(model::Model)
 	do_pca = size(model.C)[1] != 2
 	
@@ -678,27 +685,21 @@ function viz_latent_space(model::Model)
 	axislegend()
 	return fig
 end
-  ╠═╡ =#
 
 # ╔═╡ b93b5880-3a89-4028-a2dc-b93d5c6b138d
-#=╠═╡
-viz_latent_space(opt_model)
-  ╠═╡ =#
+#viz_latent_space(opt_model)
 
 # ╔═╡ 80ff40cf-1a99-4035-bc97-5e2f4a85c6b0
 # on tests data
 function compute_cm(model::Model, data::MiscibilityData)
 	m = [M_complete[i, j]            for (i, j) in data.ids_missing]
-	m̂ = [pred_mᵢⱼ(model, i, j) > 0.5 for (i, j) in data.ids_missing]
+	m̂ = [pred_mᵢⱼ(model, i, j) > model.cutoff for (i, j) in data.ids_missing]
 
 	cm = confusion_matrix(m, m̂)
 end
 
 # ╔═╡ 0db50820-15f2-4480-8efc-6e22f3b73f6c
-# ╠═╡ disabled = true
-#=╠═╡
-cm = compute_cm(opt_model, data)
-  ╠═╡ =#
+#cm = compute_cm(opt_model, data)
 
 # ╔═╡ 976e29ae-393a-48df-9dc2-e393af5dcc7a
 function viz_confusion(cm::Matrix)
@@ -728,24 +729,16 @@ function viz_confusion(cm::Matrix)
 end
 
 # ╔═╡ 35666424-d5dc-4a2f-a650-3241a0952c07
-# ╠═╡ disabled = true
-#=╠═╡
-viz_confusion(cm) # TODO compare to random guessing
-  ╠═╡ =#
+#viz_confusion(cm) # TODO compare to random guessing
 
 # ╔═╡ af3aab8a-ad59-438f-95f0-4fda1a894f27
 md"performance metrics."
 
 # ╔═╡ 3009cdd6-90b3-4262-bde8-2623e217273b
-# ╠═╡ disabled = true
-#=╠═╡
-test_perf_baseline_model(data, feature_matrix)
-  ╠═╡ =#
+#test_perf_baseline_model(data, feature_matrix)
 
 # ╔═╡ dc02c325-d493-4bda-acf9-72e41e634dcf
-#=╠═╡
-compute_perf_metrics(opt_model, data, data.ids_missing)
-  ╠═╡ =#
+#compute_perf_metrics(opt_model, data, data.ids_missing)
 
 # ╔═╡ 0fd7342c-a459-40dc-9fd8-c8b1d8103c61
 md"plot distribution of predictions on test data"
@@ -766,9 +759,7 @@ function viz_preds_on_test(model)
 end
 
 # ╔═╡ d508d3f9-ac1a-463b-9930-aa403df25558
-#=╠═╡
-viz_preds_on_test(model)
-  ╠═╡ =#
+#viz_preds_on_test(model)
 
 # ╔═╡ c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 md"## function to run experiment
@@ -784,31 +775,35 @@ if `class_kernel` is `true`, we use the class for the graph-reg. if `false`, we 
 
 # ╔═╡ 8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 function run_experiment(data::MiscibilityData;
+						#θ::Float64,
                         nfolds::Int=3, 
                         ngrid::Int=10, 
 					    nb_epochs::Int=1000,
                         graph_regularization::Bool=true,
                         class_kernel::Bool=true,
-					    seed::Union{Nothing, Int}=nothing
+	                    type_of_perf_metric::Symbol=:f1,
+					    #seed::Union{Nothing, Int}=nothing
 )
 	# create list of hyperparams to explore.
-	if ! isnothing(seed)
-		Random.seed!(seed)
-	end
+	#if ! isnothing(seed)
+	#	Random.seed!(seed)
+	#end
+	#data = sim_data_collection(data.θ, M_complete)
+	
 	cv_hyperparams = [
-		(k = rand([2, 3, 4, 5, 6]),
+		(k = rand([2,3,4,5,6]),
 		 # turn off graph reg on/off
 		 γ = graph_regularization ? rand(Uniform(0, 0.1)) : 0.0, 
 		 λ = rand(), 
 		 # kernel based on class vs. features.
-		 σ = class_kernel ? nothing : rand(Uniform(1e-1, 2))
+		 σ = class_kernel ? 10.0 : rand(Uniform(1e-1, 2))
 		)
 		    for _ = 1:ngrid]
 
 	# conduct hyper-param optimization viz K-folds cross validation on training data
 	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(
 		          data, cv_hyperparams, nfolds=nfolds, ngrid=ngrid, 
-					    nb_epochs=nb_epochs)
+					    nb_epochs=nb_epochs, type_of_perf_metric = type_of_perf_metric)
 
 	# train deployment model on all training data with opt hyper-params
 	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
@@ -826,33 +821,16 @@ function run_experiment(data::MiscibilityData;
 end
 
 # ╔═╡ 0b47f501-95fe-48ca-9627-8db4c764e2e3
-# ╠═╡ disabled = true
-#=╠═╡
-results_class_kernel = run_experiment(data, class_kernel=true, ngrid=1)
-  ╠═╡ =#
+#results_class_kernel = run_experiment(data, class_kernel=true, ngrid=1)
 
 # ╔═╡ f1626350-b043-4e14-8eef-d58e30583061
-# ╠═╡ disabled = true
-#=╠═╡
-results_class_kernel.perf_metrics
-  ╠═╡ =#
+#results_class_kernel.perf_metrics
 
 # ╔═╡ dd97d9ee-c755-4bdc-86fd-58cebbb638f1
-# ╠═╡ disabled = true
-#=╠═╡
-viz_confusion(results_class_kernel.cm)
-  ╠═╡ =#
+#viz_confusion(results_class_kernel.cm)
 
 # ╔═╡ bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
-# ╠═╡ disabled = true
-#=╠═╡
-results = run_experiment(data, ngrid=50)
-  ╠═╡ =#
-
-# ╔═╡ 31708647-bfc4-4c5f-8450-16c55e097277
-#=╠═╡
-results.perf_metrics
-  ╠═╡ =#
+#results = run_experiment(data, ngrid=10)
 
 # ╔═╡ e339ad29-f74f-4c3c-be0c-e28c67d920a3
 md"show confusion matrix and similarity matrix and clustering for a _typical_ example (median F1 score)"
@@ -861,11 +839,11 @@ md"show confusion matrix and similarity matrix and clustering for a _typical_ ex
 md"bar plot of recall, acc, pre, rec over 10 runs"
 
 # ╔═╡ f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
-## source of stochasticity over runs
-# - introducing missing values
-# - cross-validation procedure
-# - different hyperparam options
-function generate_comparison_data(θ::Float64; nruns::Int=10, ngrid::Int=10)
+function generate_comparison_data(θ::Float64;
+				  		          nruns::Int=10,
+				                  ngrid::Int=10,
+								  type_of_perf_metric::Symbol=:f1
+)
 	perf_data = DataFrame()
 	all_metrics = [:f1, :accuracy, :precision, :recall]
 	
@@ -877,127 +855,69 @@ function generate_comparison_data(θ::Float64; nruns::Int=10, ngrid::Int=10)
 		
 		### train the models.
 		# base kernel on the class
-		res = run_experiment(data, class_kernel=true, ngrid=ngrid)
+		res = run_experiment(data, class_kernel=true, ngrid=ngrid, type_of_perf_metric = type_of_perf_metric)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="class-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=0.0)
+				(run=r, model="class-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=0.0, cutoff = res.opt_model.cutoff)
 			)
 		end
 
 		# base kernel on the features
-		res = run_experiment(data, class_kernel=false, ngrid=ngrid)
+		res = run_experiment(data, class_kernel=false, ngrid=ngrid, type_of_perf_metric = type_of_perf_metric)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="feature-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=res.opt_hyperparams.σ)
+				(run=r, model="feature-based graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=res.opt_hyperparams.γ,λ=res.opt_hyperparams.λ,σ=res.opt_hyperparams.σ, cutoff = res.opt_model.cutoff)
 			)
 		end
 
 		# turn off graph regularization
-		res = run_experiment(data, graph_regularization=false, ngrid=ngrid)
+		res = run_experiment(data, graph_regularization=false, ngrid=ngrid, type_of_perf_metric = type_of_perf_metric)
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="no graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=0.0,λ=res.opt_hyperparams.λ,σ=0.0)
+				(run=r, model="no graph", score=res.perf_metrics.test[met], metric=String(met),k=res.opt_hyperparams.k,γ=0,λ=res.opt_hyperparams.λ,σ=0.0, cutoff = res.opt_model.cutoff)
 			)
 		end
 		
 		# random forest
-		res = test_perf_baseline_model(data, feature_matrix)
+		cutoffs = range(0.1, 0.9, length=20)
+		perf_rfs = zeros(length(cutoffs))
+
+		for (n, cfs) in enumerate(cutoffs)
+			res = test_perf_baseline_model(data, feature_matrix, cfs)
+			perf_rfs[n] = res[type_of_perf_metric]
+		end
+
+		opt_cutoff = cutoffs[argmax(perf_rfs)]
+		res = test_perf_baseline_model(data, feature_matrix, opt_cutoff)
+			
 		for met in all_metrics
 			push!(perf_data, 
-				(run=r, model="random forest", score=res[met], metric=String(met), k=0.0,γ=0.0,λ=0.0,σ=0.0)
-			)
+				(run=r, model="random forest", score=res[met], metric=String(met), k=0,γ=0,λ=0,σ=0.0, cutoff=opt_cutoff)
+				)
 		end
+		
 	end
 	return perf_data
 end
 
-# ╔═╡ 762096d7-b7bc-4058-9661-4bd103fb537e
-md"## analyze performance over different $\theta$"
+# ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
+#perf_data = generate_comparison_data(0.5, nruns=10, ngrid=10)
 
-# ╔═╡ 02e3e27e-bea5-41fa-b532-2d87cff4bc58
-begin
-	θs = [0.3, 0.6, 0.9]
-	perfs = []
-	for θ in θs
-		push!(perfs,
-			generate_comparison_data(θ, nruns=3, ngrid=1)
-		)
-	end
-end
+# ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
+#CSV.write("runs_theta05.csv", perf_data)
 
 # ╔═╡ 1c9df16c-36f6-4602-b6fd-89fc5349f12f
 import Gadfly
 
 # ╔═╡ cea202fe-fd6f-4832-88bf-60904846d73f
-function viz_perf(perf::DataFrame, θ::Float64)
-	return Gadfly.plot(perf, x=:metric, y=:score, color=:model,
-	    # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
-	    Gadfly.Geom.boxplot,
-		Gadfly.Guide.title("θ = $(data.θ)")
-		# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
-	    # Guide.colorkey(title="", pos=[0.78w,-0.4h])
-		# title: θ.
-	)
-end
-
-# ╔═╡ ee88642b-d5d0-4d8d-970d-29b20c2862fa
-function viz_hyperparams(perf::DataFrame, param::Symbol)
-	fig = Figure()
-	ax = Axis(fig[1, 1], xlabel="$param", ylabel="# sims")
-	hist!(perf[:, param])
-	fig
-end
-
-# ╔═╡ 2f569cec-5361-462b-a284-dbcd863a2dc2
-viz_perf(perfs[1], θ[1])
-
-# ╔═╡ 424b4414-6667-4968-8ede-82a64383e3fe
-viz_hyperparams(perf, :λ)
-
-# ╔═╡ ff765892-05f8-4a54-9078-80bbc9a50999
-viz_perf(perfs[2], θ[2])
-
-# ╔═╡ d32dd328-9dd2-42b9-a1b4-b8a7ca815d56
-viz_perf(perfs[3], θ[3])
-
-# ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
-perf_data = generate_comparison_data(0.6, nruns=3, ngrid=10)
-
-# ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
-CSV.write("runs_theta05.csv", perf_data)
-
-# ╔═╡ 5b859917-eab2-48db-834e-72bcfb207907
-# ╠═╡ disabled = true
-#=╠═╡
-class_kernel = run_experiment(.5, class_kernel=true, ngrid=2)
-  ╠═╡ =#
-
-# ╔═╡ ec5b028d-d892-40e4-b1a6-58464d160543
-# ╠═╡ disabled = true
-#=╠═╡
-runs_theta05 = generate_comparison_data(0.5)
-  ╠═╡ =#
-
-# ╔═╡ 528cc8ca-63b0-47fc-ac29-92f25e04224a
-# ╠═╡ disabled = true
-#=╠═╡
-data2, opt_model2, perf_metric2, opt_hyperparams2, fig_losses2 = run_experiment(.5, class_kernel = false)
-  ╠═╡ =#
-
-# ╔═╡ 347f6868-6db2-4ba7-b672-b996e71b4b5b
-#=╠═╡
-perf_metric2[argmax(mean(eachcol(perf_metric2))[:])]
-  ╠═╡ =#
-
-# ╔═╡ f526f24c-0e69-4cfe-9cc7-cc9ec60bc9f1
-#=╠═╡
-cm2 = compute_cm(opt_model2, data2)
-  ╠═╡ =#
-
-# ╔═╡ 0da70997-abca-4d2a-96d7-9800e75cffbf
-#=╠═╡
-compute_metric(opt_model2, data2)
-  ╠═╡ =#
+Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
+    # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
+    Gadfly.Geom.boxplot,
+	Gadfly.Guide.title("θ = $(data.θ)")
+	# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
+    # Guide.colorkey(title="", pos=[0.78w,-0.4h])
+	# title: θ.
+)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1039,9 +959,8 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.5"
+julia_version = "1.7.3"
 manifest_format = "2.0"
-project_hash = "746562f827a6b27483400c7cf0354ee8d82feb57"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1080,7 +999,6 @@ version = "0.4.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
-version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -1219,7 +1137,6 @@ version = "4.5.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.1+0"
 
 [[deps.Compose]]
 deps = ["Base64", "Colors", "DataStructures", "Dates", "IterTools", "JSON", "LinearAlgebra", "Measures", "Printf", "Random", "Requires", "Statistics", "UUIDs"]
@@ -1333,7 +1250,6 @@ version = "0.8.6"
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-version = "1.6.0"
 
 [[deps.DualNumbers]]
 deps = ["Calculus", "NaNMath", "SpecialFunctions"]
@@ -1738,12 +1654,10 @@ version = "0.3.1"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
 
 [[deps.LibGit2]]
 deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
@@ -1752,7 +1666,6 @@ uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1888,7 +1801,6 @@ version = "0.5.4"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.0+0"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -1924,7 +1836,6 @@ version = "0.3.4"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.2.1"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -1940,7 +1851,6 @@ version = "1.1.0"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
-version = "1.2.0"
 
 [[deps.Observables]]
 git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
@@ -1962,7 +1872,6 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.20+0"
 
 [[deps.OpenEXR]]
 deps = ["Colors", "FileIO", "OpenEXR_jll"]
@@ -1979,7 +1888,6 @@ version = "3.1.1+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2007,7 +1915,6 @@ version = "1.4.1"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.40.0+0"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -2060,7 +1967,6 @@ version = "0.40.1+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.8.0"
 
 [[deps.PkgVersion]]
 deps = ["Pkg"]
@@ -2203,7 +2109,6 @@ version = "0.3.0+0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
-version = "0.7.0"
 
 [[deps.SIMD]]
 deps = ["SnoopPrecompile"]
@@ -2394,7 +2299,6 @@ uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 [[deps.TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-version = "1.0.0"
 
 [[deps.TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -2411,7 +2315,6 @@ version = "1.10.0"
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
 uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
-version = "1.10.1"
 
 [[deps.TensorCore]]
 deps = ["LinearAlgebra"]
@@ -2570,7 +2473,6 @@ version = "1.4.0+3"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.12+3"
 
 [[deps.ZygoteRules]]
 deps = ["MacroTools"]
@@ -2599,7 +2501,6 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.1.1+0"
 
 [[deps.libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2628,12 +2529,10 @@ version = "1.3.7+1"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2708,6 +2607,7 @@ version = "3.5.0+0"
 # ╠═045cec66-e788-4fb1-80ad-c44ce072a88d
 # ╟─c939cb70-858d-4b57-977a-693097c78499
 # ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
+# ╠═81b10df1-8fa3-4635-8f3a-2d47d59823c5
 # ╠═92cd854b-fb84-4981-ba8e-b24ecd1509c7
 # ╠═53349731-ff98-4ed7-9877-fe8cf389e6e3
 # ╠═c3e18c21-2766-4a7f-aede-053556565621
@@ -2735,26 +2635,12 @@ version = "3.5.0+0"
 # ╠═f1626350-b043-4e14-8eef-d58e30583061
 # ╠═dd97d9ee-c755-4bdc-86fd-58cebbb638f1
 # ╠═bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
-# ╠═31708647-bfc4-4c5f-8450-16c55e097277
 # ╟─e339ad29-f74f-4c3c-be0c-e28c67d920a3
 # ╟─b836b38e-b90e-4e7b-99fd-4c8eedf88676
 # ╠═f58e52b9-5504-4b6e-95ea-2d4019ccb5a5
-# ╟─762096d7-b7bc-4058-9661-4bd103fb537e
-# ╠═02e3e27e-bea5-41fa-b532-2d87cff4bc58
-# ╠═1c9df16c-36f6-4602-b6fd-89fc5349f12f
-# ╠═cea202fe-fd6f-4832-88bf-60904846d73f
-# ╠═ee88642b-d5d0-4d8d-970d-29b20c2862fa
-# ╠═2f569cec-5361-462b-a284-dbcd863a2dc2
-# ╠═424b4414-6667-4968-8ede-82a64383e3fe
-# ╠═ff765892-05f8-4a54-9078-80bbc9a50999
-# ╠═d32dd328-9dd2-42b9-a1b4-b8a7ca815d56
 # ╠═92ec9882-1c15-4c1b-a3dc-35e12e56495d
 # ╠═673c9ce6-62cf-4d61-a48e-8481c3daf3d5
-# ╠═5b859917-eab2-48db-834e-72bcfb207907
-# ╠═ec5b028d-d892-40e4-b1a6-58464d160543
-# ╠═528cc8ca-63b0-47fc-ac29-92f25e04224a
-# ╠═347f6868-6db2-4ba7-b672-b996e71b4b5b
-# ╠═f526f24c-0e69-4cfe-9cc7-cc9ec60bc9f1
-# ╠═0da70997-abca-4d2a-96d7-9800e75cffbf
+# ╠═1c9df16c-36f6-4602-b6fd-89fc5349f12f
+# ╠═cea202fe-fd6f-4832-88bf-60904846d73f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
