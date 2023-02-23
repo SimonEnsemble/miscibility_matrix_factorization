@@ -142,7 +142,7 @@ function viz_miscibility_matrix(M)
 end
 
 # ╔═╡ acf912f1-51cf-4943-8964-c51cc3bf3427
-viz_miscibility_matrix(M_complete)
+#viz_miscibility_matrix(M_complete)
 
 # ╔═╡ 3a6f1f39-b598-4ce2-8858-b17551133bfe
 compound_names = String.(compounds[:, "NAME"])
@@ -268,7 +268,7 @@ end
 data = sim_data_collection(0.5, M_complete)
 
 # ╔═╡ 4c217dfa-2f9c-4ac9-8dfa-3f6bf270139f
-viz_miscibility_matrix(data.M)
+#viz_miscibility_matrix(data.M)
 
 # ╔═╡ 54b331da-d6c7-4b5d-b71a-bc7d33c3c71a
 md"some tests"
@@ -419,12 +419,13 @@ end
 function construct_train_model(hyperparams::NamedTuple, 
 	                           data::MiscibilityData, 
 	                           nb_epochs::Int; 
-							   α::Float64=0.01)
+							   α::Float64=0.01,
+							   cutoff::Float64=0.5)
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
 	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
-	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ, 0.5)
+	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.σ, cutoff)
 
 	# compute kernel matrix. note σ can be nothing.
 	K = kernel_matrix(hyperparams.σ)
@@ -552,13 +553,16 @@ function set_opt_cutoff!(model::Model, data::MiscibilityData, ids::Vector{Tuple{
 	model.cutoff = cutoffs[argmax(f1_scores)]
 end
 
+# ╔═╡ 2befd72e-e7b5-4749-b82f-92b5a9024f12
+
+
 # ╔═╡ 92cd854b-fb84-4981-ba8e-b24ecd1509c7
 function do_hyperparam_optimization(
 	data::MiscibilityData,
 	cv_hyperparams::Vector{<:NamedTuple};
 	nfolds::Int=3,
-	ngrid::Int,
-	nb_epochs::Int,
+	ngrid::Int=1,
+	nb_epochs::Int=1000,
 	type_of_perf_metric::Symbol=:f1
 )
 	# cross-validation split
@@ -569,7 +573,7 @@ function do_hyperparam_optimization(
 	# keep track of performance metric.
 	perf_metrics = zeros(nfolds, ngrid)
 	fill!(perf_metrics, NaN)
-
+	cutoffs = zeros(nfolds, ngrid)
 	fig_losses = Figure()
 	axs = [Axis(fig_losses[i, j]) for i = 1:nfolds, j = 1:ngrid]
 	# loop thru folds
@@ -593,12 +597,12 @@ function do_hyperparam_optimization(
 		# loop thru hyperparams
 		for (n, hps) in enumerate(cv_hyperparams)
 			# train model
-			cv_model, cv_losses = construct_train_model(hps, data, nb_epochs)
+			cv_model, cv_losses = construct_train_model(hps, cv_data, nb_epochs)
 			#_viz_loss!(axs[i_fold, n], cv_losses)
 
 			# find optimal cutoff
-			set_opt_cutoff!(cv_model, data, cv_train_entries)
-			
+			set_opt_cutoff!(cv_model, cv_data, cv_train_entries)
+			cutoffs[i_fold,n] = cv_model.cutoff
 			# evaluate on cv-test data
 			perf_metric = compute_perf_metrics(cv_model, cv_data, cv_test_entries)
 			perf_metrics[i_fold, n] = perf_metric[type_of_perf_metric]
@@ -606,9 +610,12 @@ function do_hyperparam_optimization(
 		end		
 	end
 
-	opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metrics))[:])]
+	#opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metrics))[:])]
+	opt_hps_id = argmax(mean(eachrow(perf_metrics))[:])
+	opt_hyperparams = cv_hyperparams[opt_hps_id]
+	opt_cutoff = mean(eachrow(cutoffs))[opt_hps_id]
 
-	return perf_metrics, opt_hyperparams, fig_losses
+	return perf_metrics, opt_hyperparams, fig_losses, opt_cutoff
 end
 
 # ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
@@ -618,11 +625,11 @@ end
 #test_perf_baseline_model(data, feature_matrix)
 
 # ╔═╡ 53987486-ed22-424e-b744-6033ac4be4c6
-#cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
-#				   for _ = 1:ngrid]
+cv_hyperparams = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
+			   for _ = 1:1]
 
 # ╔═╡ 434193a3-3b06-494d-b7db-09f152ad437f
-#perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, cv_hyperparams)
+#perf_metric, opt_hyperparams, fig_losses, opt_cutoff = do_hyperparam_optimization(data, cv_hyperparams)
 
 # ╔═╡ f1da061e-a8f2-4074-92cf-6183e50e10ba
 md"## viz results
@@ -801,12 +808,12 @@ function run_experiment(data::MiscibilityData;
 		    for _ = 1:ngrid]
 
 	# conduct hyper-param optimization viz K-folds cross validation on training data
-	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(
+	perf_metric, opt_hyperparams, fig_losses, opt_cutoff = do_hyperparam_optimization(
 		          data, cv_hyperparams, nfolds=nfolds, ngrid=ngrid, 
 					    nb_epochs=nb_epochs, type_of_perf_metric = type_of_perf_metric)
 
 	# train deployment model on all training data with opt hyper-params
-	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
+	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs, cutoff=opt_cutoff)
 
 	# compute performance metrics on train and test
 	perf_metrics = (test =compute_perf_metrics(opt_model, data, data.ids_missing),
@@ -821,7 +828,10 @@ function run_experiment(data::MiscibilityData;
 end
 
 # ╔═╡ 0b47f501-95fe-48ca-9627-8db4c764e2e3
-#results_class_kernel = run_experiment(data, class_kernel=true, ngrid=1)
+#results_class_kernel = run_experiment(data, ngrid=1)
+
+# ╔═╡ 8640c0d2-b4bd-4938-b36e-b3936d6c8cc5
+#results_class_kernel.opt_model.cutoff
 
 # ╔═╡ f1626350-b043-4e14-8eef-d58e30583061
 #results_class_kernel.perf_metrics
@@ -901,10 +911,10 @@ function generate_comparison_data(θ::Float64;
 end
 
 # ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
-#perf_data = generate_comparison_data(0.5, nruns=10, ngrid=10)
+#perf_data = generate_comparison_data(0.4, nruns=4, ngrid=25)
 
 # ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
-#CSV.write("runs_theta05.csv", perf_data)
+#CSV.write("runs_theta04.csv", perf_data)
 
 # ╔═╡ 1c9df16c-36f6-4602-b6fd-89fc5349f12f
 import Gadfly
@@ -2608,6 +2618,7 @@ version = "3.5.0+0"
 # ╟─c939cb70-858d-4b57-977a-693097c78499
 # ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
 # ╠═81b10df1-8fa3-4635-8f3a-2d47d59823c5
+# ╠═2befd72e-e7b5-4749-b82f-92b5a9024f12
 # ╠═92cd854b-fb84-4981-ba8e-b24ecd1509c7
 # ╠═53349731-ff98-4ed7-9877-fe8cf389e6e3
 # ╠═c3e18c21-2766-4a7f-aede-053556565621
@@ -2632,6 +2643,7 @@ version = "3.5.0+0"
 # ╟─c39c6e79-b5ec-4bf3-8c82-3ba5d043dc51
 # ╠═8c7201bb-58d3-43f0-a5eb-cce612f1f1d7
 # ╠═0b47f501-95fe-48ca-9627-8db4c764e2e3
+# ╠═8640c0d2-b4bd-4938-b36e-b3936d6c8cc5
 # ╠═f1626350-b043-4e14-8eef-d58e30583061
 # ╠═dd97d9ee-c755-4bdc-86fd-58cebbb638f1
 # ╠═bb2745c2-ff9d-48aa-b1a9-baf455dabbbd
