@@ -524,6 +524,30 @@ function test_perf_baseline_model(
 	)
 end
 
+# ╔═╡ e62d48ca-62e2-477e-aac4-b7bf2fa178b0
+function do_baseline_model_optimization(
+	data::MiscibilityData, 
+	feature_matrix::Matrix{Float64}
+)
+
+	X_train, y_train, X_test, y_test = build_Xy(data, feature_matrix)
+
+	rf = RandomForestClassifier()
+	rf.fit(X_train, y_train)
+
+	cutoffs = range(0.1, 0.9, length=20)
+	perf_rfs = zeros(length(cutoffs))
+
+	for (n, cfs) in enumerate(cutoffs)
+		prob_preds = rf.predict_proba(X_train)
+		ŷ_train = [p > cfs for p in prob_preds[:,2]]
+		perf_rfs[n] = f1_score(y_train, ŷ_train)
+	end
+
+	return opt_cutoff = cutoffs[argmax(perf_rfs)]
+end
+	
+
 # ╔═╡ c939cb70-858d-4b57-977a-693097c78499
 md"## hyperparam optimization"
 
@@ -573,7 +597,7 @@ function do_hyperparam_optimization(
 	# keep track of performance metric.
 	perf_metrics = zeros(nfolds, ngrid)
 	fill!(perf_metrics, NaN)
-	cutoffs = zeros(nfolds, ngrid)
+	#cutoffs = zeros(nfolds, ngrid)
 	fig_losses = Figure()
 	axs = [Axis(fig_losses[i, j]) for i = 1:nfolds, j = 1:ngrid]
 	# loop thru folds
@@ -599,10 +623,7 @@ function do_hyperparam_optimization(
 			# train model
 			cv_model, cv_losses = construct_train_model(hps, cv_data, nb_epochs)
 			#_viz_loss!(axs[i_fold, n], cv_losses)
-
-			# find optimal cutoff
-			set_opt_cutoff!(cv_model, cv_data, cv_train_entries)
-			cutoffs[i_fold,n] = cv_model.cutoff
+			
 			# evaluate on cv-test data
 			perf_metric = compute_perf_metrics(cv_model, cv_data, cv_test_entries)
 			perf_metrics[i_fold, n] = perf_metric[type_of_perf_metric]
@@ -610,12 +631,10 @@ function do_hyperparam_optimization(
 		end		
 	end
 
-	#opt_hyperparams = cv_hyperparams[argmax(mean(eachrow(perf_metrics))[:])]
 	opt_hps_id = argmax(mean(eachrow(perf_metrics))[:])
 	opt_hyperparams = cv_hyperparams[opt_hps_id]
-	opt_cutoff = mean(eachrow(cutoffs))[opt_hps_id]
 
-	return perf_metrics, opt_hyperparams, fig_losses, opt_cutoff
+	return perf_metrics, opt_hyperparams, fig_losses
 end
 
 # ╔═╡ 53349731-ff98-4ed7-9877-fe8cf389e6e3
@@ -808,12 +827,15 @@ function run_experiment(data::MiscibilityData;
 		    for _ = 1:ngrid]
 
 	# conduct hyper-param optimization viz K-folds cross validation on training data
-	perf_metric, opt_hyperparams, fig_losses, opt_cutoff = do_hyperparam_optimization(
+	perf_metric, opt_hyperparams, fig_losses = do_hyperparam_optimization(
 		          data, cv_hyperparams, nfolds=nfolds, ngrid=ngrid, 
 					    nb_epochs=nb_epochs, type_of_perf_metric = type_of_perf_metric)
+	
 
 	# train deployment model on all training data with opt hyper-params
-	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs, cutoff=opt_cutoff)
+	opt_model, opt_losses = construct_train_model(opt_hyperparams, data, nb_epochs)
+
+	set_opt_cutoff!(opt_model, data, data.ids_obs)
 
 	# compute performance metrics on train and test
 	perf_metrics = (test =compute_perf_metrics(opt_model, data, data.ids_missing),
@@ -889,15 +911,8 @@ function generate_comparison_data(θ::Float64;
 		end
 		
 		# random forest
-		cutoffs = range(0.1, 0.9, length=20)
-		perf_rfs = zeros(length(cutoffs))
-
-		for (n, cfs) in enumerate(cutoffs)
-			res = test_perf_baseline_model(data, feature_matrix, cfs)
-			perf_rfs[n] = res[type_of_perf_metric]
-		end
-
-		opt_cutoff = cutoffs[argmax(perf_rfs)]
+		
+		opt_cutoff = do_baseline_model_optimization(data, feature_matrix)
 		res = test_perf_baseline_model(data, feature_matrix, opt_cutoff)
 			
 		for met in all_metrics
@@ -911,10 +926,10 @@ function generate_comparison_data(θ::Float64;
 end
 
 # ╔═╡ 92ec9882-1c15-4c1b-a3dc-35e12e56495d
-#perf_data = generate_comparison_data(0.4, nruns=4, ngrid=25)
+#perf_data = generate_comparison_data(0.5, nruns=4, ngrid=25)
 
 # ╔═╡ 673c9ce6-62cf-4d61-a48e-8481c3daf3d5
-#CSV.write("runs_theta04.csv", perf_data)
+#CSV.write("runs_theta05.csv", perf_data)
 
 # ╔═╡ 1c9df16c-36f6-4602-b6fd-89fc5349f12f
 import Gadfly
@@ -923,7 +938,7 @@ import Gadfly
 Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
     # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
     Gadfly.Geom.boxplot,
-	Gadfly.Guide.title("θ = $(data.θ)")
+	Gadfly.Guide.title("θ = 0.5")
 	# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
     # Guide.colorkey(title="", pos=[0.78w,-0.4h])
 	# title: θ.
@@ -2615,6 +2630,7 @@ version = "3.5.0+0"
 # ╟─f6774107-4b4f-4054-9afe-c73226aac371
 # ╠═37a9df7d-8450-427d-8f33-6471a5cdb262
 # ╠═045cec66-e788-4fb1-80ad-c44ce072a88d
+# ╠═e62d48ca-62e2-477e-aac4-b7bf2fa178b0
 # ╟─c939cb70-858d-4b57-977a-693097c78499
 # ╠═6ceaf279-5e77-4585-812b-506c152fd6ab
 # ╠═81b10df1-8fa3-4635-8f3a-2d47d59823c5
