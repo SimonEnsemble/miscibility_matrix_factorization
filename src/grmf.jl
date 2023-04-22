@@ -1,4 +1,4 @@
-mutable struct Model
+mutable struct MFModel
 	C::Matrix{Float64} # latent vectors in cols
 	b::Float64 # bias
 	γ::Float64 # regularization param for graph structure
@@ -8,13 +8,13 @@ mutable struct Model
 	cutoff::Float64 # classification threshold
 end
 
-function pred_mᵢⱼ(model::Model, i::Int, j::Int)
+function pred_mᵢⱼ(model::MFModel, i::Int, j::Int)
 	cᵢ = model.C[:, i]
 	cⱼ = model.C[:, j]
 	return logistic(dot(cᵢ, cⱼ) + model.b)
 end
 
-function loss(data::MiscibilityData, model::Model, K::Matrix{Float64})
+function loss(data::MiscibilityData, model::MFModel, K::Matrix{Float64})
 	# code below assumes M all 0's or 1's
 	@assert all(skipmissing(data.M) .== 1 .|| skipmissing(data.M) .== 0)
 	# latent vectors are columns of C
@@ -54,7 +54,7 @@ function loss(data::MiscibilityData, model::Model, K::Matrix{Float64})
 	return l
 end
 
-function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int, K::Matrix{Float64})
+function ∇_cᵢ(data::MiscibilityData, model::MFModel, c::Int, K::Matrix{Float64})
 	∇ = zeros(size(model.C)[1])
 	
 	∇ += model.λ * 2 * model.C[:, c] # regularize latent rep.
@@ -84,7 +84,7 @@ function ∇_cᵢ(data::MiscibilityData, model::Model, c::Int, K::Matrix{Float64
 	return ∇
 end
 
-function ∇_b(data::MiscibilityData, model::Model)
+function ∇_b(data::MiscibilityData, model::MFModel)
 	∇ = 0.0
 
 	# cross-entropy loss expressing mismatch over observations
@@ -104,7 +104,7 @@ function ∇_b(data::MiscibilityData, model::Model)
 end
 
 # α: learning rate
-function grad_descent_epoch!(data::MiscibilityData, model::Model, K::Matrix{Float64}; α::Float64=0.01)
+function grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}; α::Float64=0.01)
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
 		model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
@@ -128,7 +128,7 @@ function construct_train_model(hyperparams::NamedTuple,
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
 	C_guess = 0.5 * rand(Uniform(-1, 1), (hyperparams.k, data.n_compounds))
-	model = Model(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.use_features, hyperparams.σ, cutoff)
+	model = MFModel(C_guess, b_guess, hyperparams.γ, hyperparams.λ, hyperparams.use_features, hyperparams.σ, cutoff)
     
     if hyperparams.use_features
         K = kernel_matrix(raw_data, hyperparams.σ)

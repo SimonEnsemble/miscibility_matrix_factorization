@@ -1,5 +1,6 @@
 mutable struct MiscibilityData
 	M::Matrix{Union{Int64, Missing}}
+    n_compounds::Int
 	ids_obs::Vector{Tuple{Int, Int}}
 	ids_missing::Vector{Tuple{Int, Int}}
     class_wt::Dict{Int, Float64}
@@ -64,5 +65,5 @@ function sim_data_collection(θ::Float64, raw_data::RawData;
 		end
 	end
 
-    return MiscibilityData(M, ids_obs, ids_missing, class_wt, θ)
+    return MiscibilityData(M, n_compounds, ids_obs, ids_missing, class_wt, θ)
 end

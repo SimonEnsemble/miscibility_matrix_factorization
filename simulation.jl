@@ -53,16 +53,22 @@ length(data.ids_obs)
 length(data.ids_missing)
 
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
-md"## train a model"
+md"# train a model (for kicks)"
 
 # ╔═╡ 4efa2d18-f7eb-4a95-a3df-3ff4a1a9d398
 hyperparams = (k=2, γ=0.01, λ=.5, use_features=true, σ=0.1)
 
 # ╔═╡ f04e6d6a-9337-4074-9f33-4fc70aa702da
-nb_epochs = 100
+nb_epochs = 500
 
 # ╔═╡ b22c273f-45ee-4911-987a-05613f4f5ac4
-construct_train_model(hyperparams, data, raw_data, 100)
+model, losses = construct_train_model(hyperparams, data, raw_data, nb_epochs)
+
+# ╔═╡ d2d80630-fc20-4941-a64c-3ee2d6c6cdcf
+viz_loss(losses)
+
+# ╔═╡ 189f001a-44c0-4d43-847c-933320dfabab
+viz_latent_space(model, raw_data)
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -83,3 +89,5 @@ construct_train_model(hyperparams, data, raw_data, 100)
 # ╠═4efa2d18-f7eb-4a95-a3df-3ff4a1a9d398
 # ╠═f04e6d6a-9337-4074-9f33-4fc70aa702da
 # ╠═b22c273f-45ee-4911-987a-05613f4f5ac4
+# ╠═d2d80630-fc20-4941-a64c-3ee2d6c6cdcf
+# ╠═189f001a-44c0-4d43-847c-933320dfabab

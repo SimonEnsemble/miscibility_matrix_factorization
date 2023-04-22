@@ -15,10 +15,10 @@ include.(
     ]
 )
 
-export build_miscibility_matrix, build_compound_info, retreive_raw_data, # data_prep.jl
-       viz_miscibility_matrix, # viz.jl
+export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData, # data_prep.jl
+       viz_miscibility_matrix, viz_loss, viz_latent_space, # viz.jl
        sim_data_collection, # introduce_missing_entries.jl
        class_similarity_matrix, kernel_matrix, # kernel_matrix.jl
-    construct_train_model # grmf.jl
+       construct_train_model, MFModel # grmf.jl
 
 end
