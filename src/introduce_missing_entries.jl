@@ -7,6 +7,23 @@ mutable struct MiscibilityData
 	θ::Float64
 end
 
+function run_checks(data::MiscibilityData, raw_data::RawData)
+	@assert length(data.ids_obs) * 2 + data.n_compounds == sum(.! ismissing.(data.M))
+
+	@assert all(ismissing.([data.M[i, j] for (i, j) in data.ids_missing])) # ids missing actually missing
+	@assert all(ismissing.([data.M[j, i] for (i, j) in data.ids_missing]))
+    
+	@assert all(.! ismissing.([data.M[i, j] for (i, j) in data.ids_obs])) # ids obs actually obs
+	@assert all(.! ismissing.([data.M[j, i] for (i, j) in data.ids_obs]))
+
+    @assert all(skipmissing(data.M') .== skipmissing(data.M)) # symmetry
+	for i = 1:data.n_compounds, j = 1:data.n_compounds
+		if ! ismissing(data.M[i, j])
+			@assert data.M[i, j] == raw_data.M_complete[i, j]
+		end
+	end
+end
+
 """
 θ:fraction of missing entries
 stratified split.
@@ -45,25 +62,13 @@ function sim_data_collection(θ::Float64, raw_data::RawData;
 	for i = 1:n_compounds
 		M[i, i] = 1
 	end
-	@assert length(ids_obs) * 2 + n_compounds == sum(.! ismissing.(M))
 
 	# to down-weigh the majority class
 	fraction_miscible = mean([M[i, j] for (i, j) in ids_obs])
     class_wt = Dict(0 => 1.0, 1 => (1 - fraction_miscible) / fraction_miscible)
 
-    # checks
-	@assert all(ismissing.([M[i, j] for (i, j) in ids_missing])) # ids missing actually missing
-	@assert all(ismissing.([M[j, i] for (i, j) in ids_missing]))
-    
-	@assert all(.! ismissing.([M[i, j] for (i, j) in ids_obs])) # ids obs actually obs
-	@assert all(.! ismissing.([M[j, i] for (i, j) in ids_obs]))
-
-    @assert all(skipmissing(M') .== skipmissing(M)) # symmetry
-	for i = 1:n_compounds, j = 1:n_compounds
-		if ! ismissing(M[i, j])
-			@assert M[i, j] == raw_data.M_complete[i, j]
-		end
-	end
-
-    return MiscibilityData(M, n_compounds, ids_obs, ids_missing, class_wt, θ)
+    data = MiscibilityData(M, n_compounds, ids_obs, ids_missing, class_wt, θ)
+    run_checks(data, raw_data)
+    return data
 end
+

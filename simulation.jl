@@ -9,7 +9,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI
+	using Revise, PlutoUI, Distributions
 	using MiscibilityMF
 end
 
@@ -70,6 +70,13 @@ viz_loss(losses)
 # ╔═╡ 189f001a-44c0-4d43-847c-933320dfabab
 viz_latent_space(model, raw_data)
 
+# ╔═╡ 024ce284-90f3-43e6-b701-1f13d209462f
+hyperparams_cv = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
+			   for _ = 1:3]
+
+# ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
+do_hyperparam_optimization(data, hyperparams_cv)
+
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
 # ╠═78ea2361-f2b7-4e0b-ad73-f4ddffecdff7
@@ -91,3 +98,5 @@ viz_latent_space(model, raw_data)
 # ╠═b22c273f-45ee-4911-987a-05613f4f5ac4
 # ╠═d2d80630-fc20-4941-a64c-3ee2d6c6cdcf
 # ╠═189f001a-44c0-4d43-847c-933320dfabab
+# ╠═024ce284-90f3-43e6-b701-1f13d209462f
+# ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
