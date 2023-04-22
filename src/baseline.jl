@@ -34,7 +34,7 @@ end
 function test_perf_baseline_model(
 	data::MiscibilityData,
     raw_data::RawData;
-    set_opt_cutoff::Bool=false
+    set_opt_cutoff::Bool=true
 )
     X_train, y_train, X_test, y_test = build_Xy(data, raw_data)
     

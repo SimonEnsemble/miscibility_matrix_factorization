@@ -31,5 +31,5 @@ export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData
        set_opt_cutoff!, # set_cutoff.jl
        viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, # viz.jl
        build_Xy, test_perf_baseline_model, # baseline.jl
-       run_experiment # run_expt.jl
+       run_experiment, run_experiments # run_expt.jl
 end
