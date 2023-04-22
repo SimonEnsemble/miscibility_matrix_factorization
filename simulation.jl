@@ -35,7 +35,7 @@ sum(raw_data.M_complete .== 0) / 2 # number immiscible
 sum(raw_data.M_complete .== 1) / 2 - raw_data.n_compounds # number miscible
 
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
-viz_miscibility_matrix(raw_data.M_complete, raw_data)
+# viz_miscibility_matrix(raw_data.M_complete, raw_data)
 
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
@@ -53,29 +53,47 @@ length(data.ids_obs)
 length(data.ids_missing)
 
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
-md"# train a model (for kicks)"
+md"# dev model
 
-# ╔═╡ 4efa2d18-f7eb-4a95-a3df-3ff4a1a9d398
-hyperparams = (k=2, γ=0.01, λ=.5, use_features=true, σ=0.1)
+## hyper-param search
+"
 
-# ╔═╡ f04e6d6a-9337-4074-9f33-4fc70aa702da
+# ╔═╡ 5b7bcc88-3048-4701-9349-6de5db12be92
 nb_epochs = 500
 
-# ╔═╡ b22c273f-45ee-4911-987a-05613f4f5ac4
-model, losses = construct_train_model(hyperparams, data, raw_data, nb_epochs)
-
-# ╔═╡ d2d80630-fc20-4941-a64c-3ee2d6c6cdcf
-viz_loss(losses)
-
-# ╔═╡ 189f001a-44c0-4d43-847c-933320dfabab
-viz_latent_space(model, raw_data)
-
 # ╔═╡ 024ce284-90f3-43e6-b701-1f13d209462f
-hyperparams_cv = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing)
-			   for _ = 1:3]
+hyperparams_cv = [(k=rand([2, 3]), γ=rand(Uniform(0, 0.1)), λ=rand(), σ=nothing, use_features=false)
+			   for _ = 1:5]
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-do_hyperparam_optimization(data, hyperparams_cv)
+perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data)
+
+# ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
+fig_losses
+
+# ╔═╡ 925791d7-3dee-4d6b-9baa-9ee85afb487c
+md"## train model with opt hyper-params"
+
+# ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs)
+
+# ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
+viz_loss(losses)
+
+# ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
+viz_latent_space(model, raw_data)
+
+# ╔═╡ cf67313d-8b14-40e1-abfd-ab559450e098
+compute_perf_metrics(model, raw_data, data.ids_missing)
+
+# ╔═╡ 1067cb85-a684-4a11-b4f8-173553e203df
+cm = compute_cm(model, raw_data, data.ids_missing)
+
+# ╔═╡ 51fc3d64-452b-41de-b2d2-789015fc4bd3
+# TODO set cutoffs
+
+# ╔═╡ 77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
+viz_confusion(cm)
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -93,10 +111,15 @@ do_hyperparam_optimization(data, hyperparams_cv)
 # ╠═e292d20e-9031-4276-87fb-b59685db2f72
 # ╠═6991d2b0-73df-4b09-aadf-a5877fa5aa5a
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
-# ╠═4efa2d18-f7eb-4a95-a3df-3ff4a1a9d398
-# ╠═f04e6d6a-9337-4074-9f33-4fc70aa702da
-# ╠═b22c273f-45ee-4911-987a-05613f4f5ac4
-# ╠═d2d80630-fc20-4941-a64c-3ee2d6c6cdcf
-# ╠═189f001a-44c0-4d43-847c-933320dfabab
+# ╠═5b7bcc88-3048-4701-9349-6de5db12be92
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
+# ╠═09165856-9117-47e4-8560-fc3f457ad6df
+# ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
+# ╠═a3457343-dc4d-4046-83d3-b7bdc20c427c
+# ╠═a58e7958-458f-4900-8de3-f4eeae945710
+# ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
+# ╠═cf67313d-8b14-40e1-abfd-ab559450e098
+# ╠═1067cb85-a684-4a11-b4f8-173553e203df
+# ╠═51fc3d64-452b-41de-b2d2-789015fc4bd3
+# ╠═77b9fb17-63e6-4c2c-b0ee-e5919358b4dc

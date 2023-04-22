@@ -82,3 +82,30 @@ function viz_latent_space(model::MFModel, raw_data::RawData)
 	axislegend()
 	return fig
 end
+
+function viz_confusion(cm::Matrix)
+	cm_to_plot = reverse(cm, dims=1)'
+
+	fig = Figure()
+	ax  = Axis(fig[1, 1],
+		xlabel="prediction", ylabel="truth",
+		xticks=(1:2, ["immiscible", "miscible"]),
+		yticks=(1:2, reverse(["immiscible", "miscible"]))
+	)
+    @warn "check heatmap"
+	# TODO this is messed up.
+	hm = heatmap!(cm_to_plot,
+		colormap=ColorSchemes.algae,
+		colorrange=(0, maximum(cm))
+	)
+	for i = 1:2
+        for j = 1:2
+            text!("$(Int(cm_to_plot[i, j]))",
+                  position=(i, j), align=(:center, :center), color="white",
+				  fontsize=50
+			)
+        end
+    end
+    Colorbar(fig[1, 2], hm, label="# pairs")
+	return fig
+end

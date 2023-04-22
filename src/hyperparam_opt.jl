@@ -1,6 +1,7 @@
 function do_hyperparam_optimization(
 	data::MiscibilityData,
-	hyperparams::Vector{<:NamedTuple};
+	hyperparams::Vector{<:NamedTuple},
+    raw_data::RawData;
 	nfolds::Int=3,
 	nb_epochs::Int=1000,
 	type_of_perf_metric::Symbol=:f1
@@ -35,13 +36,13 @@ function do_hyperparam_optimization(
 		run_checks(cv_data, raw_data)
 		
 		# loop thru hyperparams
-		for (n, hps) in enumerate(cv_hyperparams)
+		for (n, hps) in enumerate(hyperparams)
 			# train model
-			cv_model, cv_losses = construct_train_model(hps, cv_data, nb_epochs)
+			cv_model, cv_losses = construct_train_model(hps, cv_data, raw_data, nb_epochs)
 			_viz_loss!(axs[i_fold, n], cv_losses)
 			
 			# evaluate on cv-test data
-			perf_metric = compute_perf_metrics(cv_model, cv_data, cv_test_entries)
+			perf_metric = compute_perf_metrics(cv_model, raw_data, cv_test_entries)
 			perf_metrics[i_fold, n] = perf_metric[type_of_perf_metric]
 		end		
 	end
@@ -49,7 +50,7 @@ function do_hyperparam_optimization(
     mean_perf_over_folds = mean(eachrow(perf_metrics))[:]
     @assert length(mean_perf_over_folds) == length(hyperparams)
     opt_hps_id = argmax(mean_perf_over_folds)
-	opt_hyperparams = cv_hyperparams[opt_hps_id]
+	opt_hyperparams = hyperparams[opt_hps_id]
 
 	return perf_metrics, opt_hyperparams, fig_losses
 end

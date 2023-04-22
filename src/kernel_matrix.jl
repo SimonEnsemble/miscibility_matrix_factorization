@@ -6,7 +6,7 @@ function class_similarity_matrix(raw_data::RawData)
 			if i == j
 				K[i, j] = NaN # for safety
 			else
-				K[i, j] = compound_classes[i] == compound_classes[j]
+				K[i, j] = raw_data.classes[i] == raw_data.classes[j]
 			end
 		end
 	end
