@@ -43,6 +43,27 @@ viz_miscibility_matrix(raw_data.M_complete, raw_data)
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
 
+# ╔═╡ 6a1a696c-88e5-46b3-abcc-376ec8099d90
+# ╠═╡ disabled = true
+#=╠═╡
+θ = 0.4 # fraction missing
+  ╠═╡ =#
+
+# ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
+#=╠═╡
+data = sim_data_collection(θ, raw_data, weigh_classes=false)
+  ╠═╡ =#
+
+# ╔═╡ e292d20e-9031-4276-87fb-b59685db2f72
+#=╠═╡
+length(data.ids_obs)
+  ╠═╡ =#
+
+# ╔═╡ 6991d2b0-73df-4b09-aadf-a5877fa5aa5a
+#=╠═╡
+length(data.ids_missing)
+  ╠═╡ =#
+
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
 
@@ -63,8 +84,41 @@ hyperparams_cv = [(
 	use_features=false)
 			   for _ = 1:5]
 
+# ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
+#=╠═╡
+perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
+  ╠═╡ =#
+
+# ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
+#=╠═╡
+fig_losses
+  ╠═╡ =#
+
 # ╔═╡ 925791d7-3dee-4d6b-9baa-9ee85afb487c
 md"## train model with opt hyper-params"
+
+# ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
+#=╠═╡
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true)
+  ╠═╡ =#
+
+# ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
+#=╠═╡
+viz_loss(losses)
+  ╠═╡ =#
+
+# ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
+#=╠═╡
+begin
+	set_opt_cutoff!(model, raw_data, data.ids_obs)
+	# model.cutoff = 0.5
+end
+  ╠═╡ =#
+
+# ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
+#=╠═╡
+viz_latent_space(model, raw_data)
+  ╠═╡ =#
 
 # ╔═╡ 1069ec41-4733-4111-becd-043a104d1c35
 md"
@@ -78,75 +132,46 @@ precision = P(+ | pred +)
 does not even consider the negative, P(test - | -) = 1 - P(test + | -)
 "
 
+# ╔═╡ cf67313d-8b14-40e1-abfd-ab559450e098
+#=╠═╡
+perf = compute_perf_metrics(model, raw_data, data.ids_missing)
+  ╠═╡ =#
+
+# ╔═╡ 77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
+#=╠═╡
+viz_confusion(perf.cm)
+  ╠═╡ =#
+
 # ╔═╡ 1ce32f38-22e1-43a1-8aa8-49141573208c
 md"## baseline model"
+
+# ╔═╡ ea729838-bdd8-4e17-823d-ac027de562c8
+#=╠═╡
+baseline = test_perf_baseline_model(data, raw_data, set_opt_cutoff=true)
+  ╠═╡ =#
+
+# ╔═╡ f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
+#=╠═╡
+viz_confusion(Float64.(baseline.cm) / 2)
+  ╠═╡ =#
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
 
-# ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
-data = sim_data_collection(θ, raw_data, weigh_classes=false)
-
-# ╔═╡ e292d20e-9031-4276-87fb-b59685db2f72
-length(data.ids_obs)
-
-# ╔═╡ 6991d2b0-73df-4b09-aadf-a5877fa5aa5a
-length(data.ids_missing)
-
-# ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
-
-# ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
-fig_losses
-
-# ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true)
-
-# ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
-viz_loss(losses)
-
-# ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
-viz_latent_space(model, raw_data)
-
-# ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
-begin
-	set_opt_cutoff!(model, raw_data, data.ids_obs)
-	# model.cutoff = 0.5
-end
-
-# ╔═╡ cf67313d-8b14-40e1-abfd-ab559450e098
-perf = compute_perf_metrics(model, raw_data, data.ids_missing)
-
-# ╔═╡ 77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
-viz_confusion(perf.cm)
-
-# ╔═╡ ea729838-bdd8-4e17-823d-ac027de562c8
-baseline = test_perf_baseline_model(data, raw_data, set_opt_cutoff=true)
-
-# ╔═╡ f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
-viz_confusion(Float64.(baseline.cm) / 2)
-
-# ╔═╡ 9eb0e48e-70a1-4de5-b9fd-c59c522b0e0d
-perf_data = run_experiments(θ, raw_data)
-
-# ╔═╡ 6a4d52bf-8328-4ec5-abad-f42ce50b9679
-Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
-    # Gadfly.Scale.x_discrete(levels=["F1", "accuracy", "precision", "recall"]),
-    Gadfly.Geom.boxplot,
-	Gadfly.Guide.title("θ = $θ")
-	# Gadfly.Theme(boxplot_spacing=0.6Gadfly.cx),
-    # Guide.colorkey(title="", pos=[0.78w,-0.4h])
-	# title: θ.
-)
-
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
-θ = 0.4
+θs = [0.3, 0.5, 0.7]
 
-# ╔═╡ 6a1a696c-88e5-46b3-abcc-376ec8099d90
-# ╠═╡ disabled = true
-#=╠═╡
-θ = 0.4 # fraction missing
-  ╠═╡ =#
+# ╔═╡ ea48a8dd-d504-4025-bab4-b2f57e1fd256
+for θ in θs
+	perf_data = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=15)
+
+	p = Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
+	    Gadfly.Geom.boxplot,
+		Gadfly.Guide.title("θ = $θ"),
+		Gadfly.Coord.cartesian(ymin=0.0, ymax=1.0)
+	)
+	p |> Gadfly.PDF("results_$θ.pdf")
+end
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -182,5 +207,4 @@ Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
 # ╠═f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
-# ╠═9eb0e48e-70a1-4de5-b9fd-c59c522b0e0d
-# ╠═6a4d52bf-8328-4ec5-abad-f42ce50b9679
+# ╠═ea48a8dd-d504-4025-bab4-b2f57e1fd256
