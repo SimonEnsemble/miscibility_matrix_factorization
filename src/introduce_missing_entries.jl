@@ -30,6 +30,7 @@ stratified split.
 important note: we only pay attn to upper triangle of matrix.
 """
 function sim_data_collection(θ::Float64, raw_data::RawData;
+                             weigh_classes::Bool=false,
                              seed::Union{Nothing, Int}=nothing)
 	if ! isnothing(seed)
 		Random.seed!(seed)
@@ -65,7 +66,11 @@ function sim_data_collection(θ::Float64, raw_data::RawData;
 
 	# to down-weigh the majority class
 	fraction_miscible = mean([M[i, j] for (i, j) in ids_obs])
-    class_wt = Dict(0 => 1.0, 1 => (1 - fraction_miscible) / fraction_miscible)
+    if weigh_classes
+        class_wt = Dict(0 => 1.0, 1 => (1 - fraction_miscible) / fraction_miscible)
+    else
+        class_wt = Dict(0 => 1.0, 1 => 1.0)
+    end
 
     data = MiscibilityData(M, n_compounds, ids_obs, ids_missing, class_wt, θ)
     run_checks(data, raw_data)

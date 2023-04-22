@@ -100,7 +100,7 @@ function viz_confusion(cm::Matrix)
 	)
 	for i = 1:2
         for j = 1:2
-            text!("$(Int(cm_to_plot[i, j]))",
+            text!("$(round(Int, cm_to_plot[i, j]))",
                   position=(i, j), align=(:center, :center), color="white",
 				  fontsize=50
 			)

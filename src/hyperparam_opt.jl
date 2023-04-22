@@ -4,7 +4,7 @@ function do_hyperparam_optimization(
     raw_data::RawData;
 	nfolds::Int=3,
 	nb_epochs::Int=250,
-	type_of_perf_metric::Symbol=:f1,
+	type_of_perf_metric::Symbol=:balanced_accuracy,
     record_loss::Bool=false
 )
 	# cross-validation split
