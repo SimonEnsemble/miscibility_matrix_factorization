@@ -18,7 +18,7 @@ end
 
 include.(
     [
-     "data_prep.jl", "introduce_missing_entries.jl", "kernel_matrix.jl", "grmf.jl", "perf.jl", "hyperparam_opt.jl", "viz.jl"
+     "data_prep.jl", "introduce_missing_entries.jl", "kernel_matrix.jl", "grmf.jl", "perf.jl", "hyperparam_opt.jl", "set_cutoff.jl", "viz.jl"
     ]
 )
 
@@ -28,5 +28,6 @@ export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData
        construct_train_model, MFModel, # grmf.jl
        compute_perf_metrics, compute_cm, # perf.jl
        do_hyperparam_optimization, # hyperparam_opt.jl
+       set_opt_cutoff!, # set_cutoff.jl
        viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion # viz.jl
 end

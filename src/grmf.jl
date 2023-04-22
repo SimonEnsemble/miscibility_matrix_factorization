@@ -123,7 +123,8 @@ function construct_train_model(hyperparams::NamedTuple,
                                raw_data::RawData,
 	                           nb_epochs::Int;
 							   α::Float64=0.01, # learning rate
-							   cutoff::Float64=0.5)
+							   cutoff::Float64=0.5,
+                               record_loss::Bool=false)
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
@@ -141,7 +142,9 @@ function construct_train_model(hyperparams::NamedTuple,
 	losses = [NaN for _ = 1:nb_epochs]
 	for s = 1:nb_epochs
 		grad_descent_epoch!(data, model, K, α=α)
-		losses[s] = loss(data, model, K)
+        if record_loss
+            losses[s] = loss(data, model, K)
+        end
 	end
 	return model, losses
 end

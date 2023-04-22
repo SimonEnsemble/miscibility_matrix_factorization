@@ -3,8 +3,9 @@ function do_hyperparam_optimization(
 	hyperparams::Vector{<:NamedTuple},
     raw_data::RawData;
 	nfolds::Int=3,
-	nb_epochs::Int=1000,
-	type_of_perf_metric::Symbol=:f1
+	nb_epochs::Int=250,
+	type_of_perf_metric::Symbol=:f1,
+    record_loss::Bool=false
 )
 	# cross-validation split
 	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
@@ -16,7 +17,9 @@ function do_hyperparam_optimization(
 	fill!(perf_metrics, NaN)
 	
     fig_losses = Figure()
-    axs = [Axis(fig_losses[i, j]) for i = 1:nfolds, j = 1:length(hyperparams)]
+    if record_loss
+        axs = [Axis(fig_losses[i, j]) for i = 1:nfolds, j = 1:length(hyperparams)]
+    end
 	# loop thru folds
 	for (i_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
 		# get the list of matrix entries, vector of tuples
@@ -39,7 +42,9 @@ function do_hyperparam_optimization(
 		for (n, hps) in enumerate(hyperparams)
 			# train model
 			cv_model, cv_losses = construct_train_model(hps, cv_data, raw_data, nb_epochs)
-			_viz_loss!(axs[i_fold, n], cv_losses)
+            if record_loss
+                _viz_loss!(axs[i_fold, n], cv_losses)
+            end
 			
 			# evaluate on cv-test data
 			perf_metric = compute_perf_metrics(cv_model, raw_data, cv_test_entries)
