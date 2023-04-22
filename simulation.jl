@@ -143,21 +143,45 @@ md"# multiple runs and sparsities"
 @bind do_multiple_runs CheckBox(default=false)
 
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
-θs = [0.3, 0.5, 0.7]
+θs = [0.2, 0.5, 0.8]
 
 # ╔═╡ ea48a8dd-d504-4025-bab4-b2f57e1fd256
 if do_multiple_runs
+	θ_to_perf = Dict()
 	@showprogress for θ in θs
-		perf_data = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=15)
-	
-		p = Gadfly.plot(perf_data, x=:metric, y=:score, color=:model,
-		    Gadfly.Geom.boxplot,
+		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=15)
+	end
+end
+
+# ╔═╡ 5906e98f-2d7d-4416-abf0-7d64e927bb40
+if do_multiple_runs
+	for θ in θs
+		# performance
+		p = Gadfly.plot(θ_to_perf[θ], x=:metric, y=:score, color=:model,
+			Gadfly.Geom.boxplot,
 			Gadfly.Guide.title("θ = $θ"),
-			Gadfly.Coord.cartesian(ymin=0.0, ymax=1.0)
+			Gadfly.Coord.cartesian(ymin=0.4, ymax=1.0)
 		)
 		p |> Gadfly.PDF("results_$θ.pdf")
 	end
 end
+
+# ╔═╡ d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
+function viz_hyperparam(hp::Symbol, perf_data::DataFrame)# performance
+	return Gadfly.plot(filter(row -> row["metric"] == "f1", perf_data), y=hp, x=:model, color=:model,
+		Gadfly.Geom.beeswarm
+		# Gadfly.Coord.cartesian(ymin=0.4, ymax=1.0)
+	)
+end
+
+# ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
+viz_hyperparam(:λ, θ_to_perf[0.2])
+
+# ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
+viz_hyperparam(:γ, θ_to_perf[0.2])
+
+# ╔═╡ f37c6347-17fe-4166-bcad-3f5951c70dcb
+viz_hyperparam(:k, θ_to_perf[0.2])
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -195,3 +219,8 @@ end
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
 # ╠═ea48a8dd-d504-4025-bab4-b2f57e1fd256
+# ╠═5906e98f-2d7d-4416-abf0-7d64e927bb40
+# ╠═d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
+# ╠═3c8a8663-d588-44b8-a244-e84e7ef964dc
+# ╠═c09d65a7-3457-4a5a-8521-d01513797dd2
+# ╠═f37c6347-17fe-4166-bcad-3f5951c70dcb
