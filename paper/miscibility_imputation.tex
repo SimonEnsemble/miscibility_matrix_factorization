@@ -78,6 +78,15 @@ loss:
 
 gradients
 
+\begin{equation*}
+     \nabla_{\vec{c_i}}\ell = -\sum_{(i,j) \in \Omega} \vec{c_j} (\hat{m}_{ij} -m_{ij}) +  2\gamma \sum_{(i,j)} K(i,j)( \vec{c_i} - \vec{c_j}) + 2\lambda \sum_{i} \vec{c_i} \\
+\end{equation*}
+
+\begin{equation*}
+     \nabla_b\ell = -\sum_{(i,j) \in \Omega}  (\hat{m}_{ij} -m_{ij})  \\
+\end{equation*}
+
+
 \subsection{Hyperparameter tuning}
 parameters: 
 \begin{itemize}	
