@@ -45,6 +45,7 @@ function viz_loss(losses::Vector{Float64})
 	fig = Figure()
 	ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
 	_viz_loss!(ax, losses)
+    save("loss.pdf", fig)
 	fig
 end
 
