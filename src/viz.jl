@@ -35,6 +35,7 @@ function viz_miscibility_matrix(M, raw_data::RawData)
 		legend_patchsize = (35, 35, 35)
 	end
 	Legend(fig[1, 2], legend_patches, legend_labels, patchsize=legend_patchsize)
+    save("miscibility_matrix.pdf", fig)
 	return fig
 end
 
@@ -80,10 +81,11 @@ function viz_latent_space(model::MFModel, raw_data::RawData)
 		)
 	end
 	axislegend()
+    save("latent_space.pdf", fig)
 	return fig
 end
 
-function viz_confusion(cm::Matrix)
+function viz_confusion(cm::Matrix; save_fig::Bool=false)
 	cm_to_plot = reverse(cm, dims=1)'
 
 	fig = Figure()
@@ -92,8 +94,6 @@ function viz_confusion(cm::Matrix)
 		xticks=(1:2, ["immiscible", "miscible"]),
 		yticks=(1:2, reverse(["immiscible", "miscible"]))
 	)
-    @warn "check heatmap"
-	# TODO this is messed up.
 	hm = heatmap!(cm_to_plot,
 		colormap=ColorSchemes.algae,
 		colorrange=(0, maximum(cm))
@@ -107,5 +107,8 @@ function viz_confusion(cm::Matrix)
         end
     end
     Colorbar(fig[1, 2], hm, label="# pairs")
+    if save_fig
+        save("confusion_matrix.pdf", fig)
+    end
 	return fig
 end
