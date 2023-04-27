@@ -101,7 +101,8 @@ function viz_confusion(cm::Matrix; save_fig::Bool=false)
 	ax  = Axis(fig[1, 1],
 		xlabel="prediction", ylabel="truth",
 		xticks=(1:2, ["immiscible", "miscible"]),
-		yticks=(1:2, reverse(["immiscible", "miscible"]))
+		yticks=(1:2, reverse(["immiscible", "miscible"])),
+        yticklabelrotation=π/2
 	)
 	hm = heatmap!(cm_to_plot,
 		colormap=ColorSchemes.algae,
