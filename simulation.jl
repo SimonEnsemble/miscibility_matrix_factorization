@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.24
+# v0.19.25
 
 using Markdown
 using InteractiveUtils
@@ -19,8 +19,22 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter
+	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie
 	using MiscibilityMF
+end
+
+# ╔═╡ 006c7e92-e8a5-471e-92be-4d27134295f4
+begin
+	import AlgebraOfGraphics
+	AlgebraOfGraphics.set_aog_theme!(fonts=[AlgebraOfGraphics.firasans("Light"), AlgebraOfGraphics.firasans("Light")])
+	the_resolution = (500, 380)
+	update_theme!(
+		fontsize=20, 
+		linewidth=4,
+		markersize=14,
+		titlefont=AlgebraOfGraphics.firasans("Light"),
+		resolution=the_resolution
+	)
 end
 
 # ╔═╡ 818f126f-61b2-4a8f-8b47-7b7dae87ba47
@@ -65,6 +79,9 @@ length(data.ids_obs)
 # ╔═╡ 6991d2b0-73df-4b09-aadf-a5877fa5aa5a
 length(data.ids_missing)
 
+# ╔═╡ 8d1b193b-a66c-4f37-80ae-7083f93ceb78
+viz_miscibility_matrix(data.M, raw_data)
+
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
 
@@ -92,13 +109,18 @@ perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyp
 fig_losses
 
 # ╔═╡ 925791d7-3dee-4d6b-9baa-9ee85afb487c
-md"## train model with opt hyper-params"
+md"## train model with opt hyper-params
+
+TODO: study sensitivity w.r.t. loss"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true)
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.01 / 1.5)
+
+# ╔═╡ 2533b992-e881-417e-ba9b-7c3555751340
+losses[end]
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
-viz_loss(losses)
+viz_loss(losses) # TODO ask Joshua
 
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 begin
@@ -124,8 +146,11 @@ does not even consider the negative, P(test - | -) = 1 - P(test + | -)
 # ╔═╡ cf67313d-8b14-40e1-abfd-ab559450e098
 perf = compute_perf_metrics(model, raw_data, data.ids_missing)
 
+# ╔═╡ 29400905-c956-4272-b721-9896a41ffce1
+perf.cm
+
 # ╔═╡ 77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
-viz_confusion(perf.cm)
+viz_confusion(perf.cm, save_fig=true)
 
 # ╔═╡ 1ce32f38-22e1-43a1-8aa8-49141573208c
 md"## baseline model"
@@ -185,6 +210,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
+# ╠═006c7e92-e8a5-471e-92be-4d27134295f4
 # ╠═818f126f-61b2-4a8f-8b47-7b7dae87ba47
 # ╠═78ea2361-f2b7-4e0b-ad73-f4ddffecdff7
 # ╟─59986921-6e8c-4d38-ae3c-7e7ba1bc246d
@@ -199,6 +225,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
 # ╠═e292d20e-9031-4276-87fb-b59685db2f72
 # ╠═6991d2b0-73df-4b09-aadf-a5877fa5aa5a
+# ╠═8d1b193b-a66c-4f37-80ae-7083f93ceb78
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
 # ╠═5b7bcc88-3048-4701-9349-6de5db12be92
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
@@ -206,11 +233,13 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
 # ╠═a3457343-dc4d-4046-83d3-b7bdc20c427c
+# ╠═2533b992-e881-417e-ba9b-7c3555751340
 # ╠═a58e7958-458f-4900-8de3-f4eeae945710
 # ╠═33e459c3-0d6a-4999-816f-54069bbad86f
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
 # ╠═cf67313d-8b14-40e1-abfd-ab559450e098
+# ╠═29400905-c956-4272-b721-9896a41ffce1
 # ╠═77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
 # ╟─1ce32f38-22e1-43a1-8aa8-49141573208c
 # ╠═ea729838-bdd8-4e17-823d-ac027de562c8
