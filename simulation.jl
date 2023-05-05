@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.25
+# v0.19.20
 
 using Markdown
 using InteractiveUtils
@@ -54,6 +54,9 @@ raw_data.X
 
 # ╔═╡ 417910f2-15e6-4db5-b7f6-b14275ef43c7
 unique(raw_data.classes)
+
+# ╔═╡ 6a683231-7767-4383-a4f0-531b0724513f
+raw_data.classes
 
 # ╔═╡ c4a26802-2a30-4b8e-b057-2fce989f0aa0
 sum(raw_data.M_complete .== 0) / 2 # number immiscible
@@ -217,6 +220,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═11ed0c10-24d7-4c4e-a9f3-4625d96ee7ff
 # ╠═2090c5f8-cd9c-4bd5-abd5-b5724420c940
 # ╠═417910f2-15e6-4db5-b7f6-b14275ef43c7
+# ╠═6a683231-7767-4383-a4f0-531b0724513f
 # ╠═c4a26802-2a30-4b8e-b057-2fce989f0aa0
 # ╠═e6a9d962-21c3-4823-85f4-1dc11a19a251
 # ╠═f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
