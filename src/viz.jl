@@ -25,6 +25,21 @@ function viz_miscibility_matrix(M, raw_data::RawData)
 		hlines!(i - 0.5, color="gray", linewidth=1)
 		vlines!(i - 0.5, color="gray", linewidth=1)
 	end
+	
+	# add brackets
+	b_ax = Axis(fig[1, 1, Bottom()], height=40, xautolimitmargin = (0, 0))
+    hidedecorations!(b_ax); 
+	hidespines!(b_ax)
+    linkxaxes!(b_ax, ax)
+    ylims!(b_ax, low = 0)
+
+	x0 = 0
+	for c in unique(compounds[:,:CLASS])
+		l = sum(compounds[:, :CLASS] .== c)
+		bracket!(b_ax, x0, 5, x0+l-1, 5.0001, orientation=:down, fontsize=18, text=c, color=class_to_color[c])
+		x0 += l
+	end
+	
 	## legend
 	legend_patches = [
 		PolyElement(color=miscibility_colormap[1], strokecolor="gray"), 
