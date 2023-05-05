@@ -40,8 +40,13 @@ begin
 
 	# omit some labels
 	
-	gp = gplot(graph, locs_x, locs_y, nodelabel=nodelabel, nodefillc=nodefillc)
-	draw(PDF("graph.pdf", 16cm, 16cm), gp)
+	nodelabel[1:sum(raw_data.classes .== "Polymer")] .= ""
+	p = rand(1:sum(raw_data.classes .== "Polymer"),10)
+	nodelabel[p] = raw_data.compounds[p]
+	
+	#gp = gplot(graph, locs_x, locs_y, nodelabel=nodelabel, nodefillc=nodefillc)
+	gp = gplot(graph, nodelabel=nodelabel, nodefillc=nodefillc)
+	#draw(PDF("graph.pdf", 16cm, 16cm), gp)
 	gp
 end
 
