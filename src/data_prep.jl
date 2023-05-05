@@ -33,7 +33,7 @@ retreive compound names, classes, and feature matrix.
 """
 function build_compound_info()
     # compound info
-    compounds = CSV.read("compounds.csv", DataFrame)
+    compounds = CSV.read(joinpath("data", "compounds.csv"), DataFrame)
     compound_names = String.(compounds[:, "NAME"])
     compound_classes = String.(compounds[:, "CLASS"])
 
