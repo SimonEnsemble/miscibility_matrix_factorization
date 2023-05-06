@@ -1,4 +1,4 @@
-class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.Accent_4))
+class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.seaborn_bright[1:4]))
 class_to_marker = Dict("Polymer"    => :circle,
 					   "Protein"    => :rect,
 					   "Surfactant" => :diamond,
@@ -15,41 +15,41 @@ function viz_miscibility_matrix(M, raw_data::RawData)
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
 		ygridvisible=false, 
-		aspect=DataAspect(),
+		#aspect=DataAspect(),
         xticks=(1:raw_data.n_compounds, raw_data.compounds),
         yticks=(1:raw_data.n_compounds, reverse(raw_data.compounds)),
 		xticklabelrotation=π/2
 	)
-	heatmap!(reverse(M', dims=2), colormap=miscibility_colormap, aspect=DataAspect())
+	heatmap!(ax, reverse(M', dims=2), colormap=miscibility_colormap)
 	for i = 1:raw_data.n_compounds+1
-		hlines!(i - 0.5, color="gray", linewidth=1)
-		vlines!(i - 0.5, color="gray", linewidth=1)
+		hlines!(ax, i - 0.5, color="gray", linewidth=1)
+		vlines!(ax, i - 0.5, color="gray", linewidth=1)
 	end
 	
 	# add brackets to indicate the class of the compound
-    t_ax = Axis(fig[1, 1, Top()], height=50, xautolimitmargin = (0, 0))
-	#l_ax = Axis(fig[1, 1, Left()], height=40, xautolimitmargin=(0, 0))
-    for a in [t_ax]
-        #hidedecorations!(a)
-        #hidespines!(a)
+    t_ax = Axis(fig[1, 1, Top()], height=50, xautolimitmargin=(0, 0))
+    r_ax = Axis(fig[1, 1, Right()], width=50, yautolimitmargin=(0, 0))
+    for a in [t_ax, r_ax]
+        hidedecorations!(a)
+        hidespines!(a)
     end
-    ylims!(t_ax, 0, 2) # to see text
-    linkxaxes!(ax, t_ax)
 
-
-	x0 = 0.5
-    y0 = 0
+	c0 = 0.5
     for c in unique(raw_data.classes) # loop thru classes
 		l = sum(raw_data.classes .== c) # number of instances of this class
 
         # draw brackets on bottom
-		bracket!(t_ax, x0, 0, x0 + l, 0, orientation=:up, fontsize=18, text=c, color=class_to_color[c])
-		x0 += l
+        bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/2, font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
 
         # draw brackets on top
-		#bracket!(l_ax, 5, y0, 5.0001, y0 + l - 1, orientation=:down, fontsize=18, text=c, color=class_to_color[c])
-        y0 += l
+        bracket!(r_ax, 0, c0 + 0.5, 0, c0 + l - 0.5, orientation=:down, fontsize=big_fontsize/2, font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+		
+        c0 += l
 	end
+    linkxaxes!(ax, t_ax)
+    linkyaxes!(ax, r_ax)
+    ylims!(t_ax, 0, 2) # to see text
+    xlims!(r_ax, 0, 2) # to see text
 	
 	## legend
 	legend_patches = [
@@ -63,6 +63,7 @@ function viz_miscibility_matrix(M, raw_data::RawData)
 		push!(legend_labels, "missing")
 		legend_patchsize = (35, 35, 35)
 	end
+    # this messes up the brackets
 	Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal, labelsize=big_fontsize)
     save("miscibility_matrix.pdf", fig)
 	return fig
