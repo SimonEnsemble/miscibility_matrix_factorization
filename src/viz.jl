@@ -5,7 +5,7 @@ class_to_marker = Dict("Polymer"    => :circle,
 					   "Salt"       => :cross)
 miscibility_colormap = reverse(ColorSchemes.turbid)
 
-function viz_miscibility_matrix(M, raw_data::RawData)
+function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
     big_fontsize = 50
 
 	fig = Figure(resolution=(1400, 1400))
@@ -15,57 +15,66 @@ function viz_miscibility_matrix(M, raw_data::RawData)
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
 		ygridvisible=false, 
-		#aspect=DataAspect(),
         xticks=(1:raw_data.n_compounds, raw_data.compounds),
         yticks=(1:raw_data.n_compounds, reverse(raw_data.compounds)),
 		xticklabelrotation=π/2
 	)
+    if ! draw_brackets
+        ax.aspect = DataAspect()
+    end
 	heatmap!(ax, reverse(M', dims=2), colormap=miscibility_colormap)
 	for i = 1:raw_data.n_compounds+1
 		hlines!(ax, i - 0.5, color="gray", linewidth=1)
 		vlines!(ax, i - 0.5, color="gray", linewidth=1)
 	end
 	
-	# add brackets to indicate the class of the compound
-    t_ax = Axis(fig[1, 1, Top()], height=50, xautolimitmargin=(0, 0))
-    r_ax = Axis(fig[1, 1, Right()], width=50, yautolimitmargin=(0, 0))
-    for a in [t_ax, r_ax]
-        hidedecorations!(a)
-        hidespines!(a)
+    if draw_brackets
+        # add brackets to indicate the class of the compound
+        t_ax = Axis(fig[1, 1, Top()], height=50, xautolimitmargin=(0, 0))
+        r_ax = Axis(fig[1, 1, Right()], width=50, yautolimitmargin=(0, 0))
+        for a in [t_ax, r_ax]
+            hidedecorations!(a)
+            hidespines!(a)
+        end
+
+        c0 = 0.5
+        for c in unique(raw_data.classes) # loop thru classes
+            l = sum(raw_data.classes .== c) # number of instances of this class
+
+            # draw brackets on bottom
+            bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8, 
+                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+
+            # draw brackets on top
+            bracket!(r_ax, 0, c0 + 0.5, 0, c0 + l - 0.5, orientation=:down, fontsize=big_fontsize/1.8, 
+                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+            
+            c0 += l
+        end
+
+        linkxaxes!(ax, t_ax)
+        linkyaxes!(ax, r_ax)
+        ylims!(t_ax, 0, 2) # to see text
+        xlims!(r_ax, 0, 2) # to see text
+        colsize!(fig.layout, 1, Aspect(1, 1.0))
     end
 
-	c0 = 0.5
-    for c in unique(raw_data.classes) # loop thru classes
-		l = sum(raw_data.classes .== c) # number of instances of this class
-
-        # draw brackets on bottom
-        bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/2, font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
-
-        # draw brackets on top
-        bracket!(r_ax, 0, c0 + 0.5, 0, c0 + l - 0.5, orientation=:down, fontsize=big_fontsize/2, font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
-		
-        c0 += l
-	end
-    linkxaxes!(ax, t_ax)
-    linkyaxes!(ax, r_ax)
-    ylims!(t_ax, 0, 2) # to see text
-    xlims!(r_ax, 0, 2) # to see text
-	
 	## legend
 	legend_patches = [
-		PolyElement(color=miscibility_colormap[1], strokecolor="gray"), 
-        PolyElement(color=miscibility_colormap[end], strokecolor="gray")
+		PolyElement(color=miscibility_colormap[1], strokecolor="gray", polystrokewidth=1), 
+        PolyElement(color=miscibility_colormap[end], strokecolor="gray", polystrokewidth=1)
 	]
 	legend_labels = ["immiscible", "miscible"]
 	legend_patchsize = (35, 35)
 	if any(ismissing.(M))
-		push!(legend_patches, PolyElement(color="white", strokecolor="gray"))
+		push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
 		push!(legend_labels, "missing")
 		legend_patchsize = (35, 35, 35)
 	end
+    resize_to_layout!(fig)
     # this messes up the brackets
 	Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal, labelsize=big_fontsize)
-    save("miscibility_matrix.pdf", fig)
+    #save("miscibility_matrix.pdf", fig)
 	return fig
 end
 

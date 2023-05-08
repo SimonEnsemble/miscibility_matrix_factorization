@@ -83,7 +83,7 @@ length(data.ids_obs)
 length(data.ids_missing)
 
 # ╔═╡ 8d1b193b-a66c-4f37-80ae-7083f93ceb78
-viz_miscibility_matrix(data.M, raw_data)
+viz_miscibility_matrix(data.M, raw_data, draw_brackets=false)
 
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
