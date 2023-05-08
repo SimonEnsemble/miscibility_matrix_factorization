@@ -133,7 +133,7 @@ end
 function viz_confusion(cm::Matrix; save_fig::Bool=false)
 	cm_to_plot = reverse(cm, dims=1)'
 
-	fig = Figure()
+    fig = Figure(resolution=(300, 300))
 	ax  = Axis(fig[1, 1],
 		xlabel="prediction", ylabel="truth",
 		xticks=(1:2, ["immiscible", "miscible"]),
@@ -156,7 +156,7 @@ function viz_confusion(cm::Matrix; save_fig::Bool=false)
         for j = 1:2
             text!("$(round(Int, cm_to_plot[i, j]))",
                   position=(i, j), align=(:center, :center), color="black",
-				  fontsize=50
+				  fontsize=45
 			)
         end
     end

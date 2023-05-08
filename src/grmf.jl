@@ -122,7 +122,7 @@ function construct_train_model(hyperparams::NamedTuple,
 	                           data::MiscibilityData,
                                raw_data::RawData,
 	                           nb_epochs::Int;
-							   α::Float64=0.01, # learning rate
+							   α::Float64=0.006, # learning rate
 							   cutoff::Float64=0.5,
                                record_loss::Bool=false)
 	# initialize model
