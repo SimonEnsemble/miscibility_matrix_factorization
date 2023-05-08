@@ -74,7 +74,11 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
     resize_to_layout!(fig)
     # this messes up the brackets
 	Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal, labelsize=big_fontsize)
-    #save("miscibility_matrix.pdf", fig)
+    if draw_brackets
+        notify(t_ax.finallimits)
+        notify(r_ax.finallimits)
+    end
+    save("miscibility_matrix.pdf", fig)
 	return fig
 end
 
