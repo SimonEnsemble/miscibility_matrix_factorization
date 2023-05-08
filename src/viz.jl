@@ -137,22 +137,31 @@ function viz_confusion(cm::Matrix; save_fig::Bool=false)
 	ax  = Axis(fig[1, 1],
 		xlabel="prediction", ylabel="truth",
 		xticks=(1:2, ["immiscible", "miscible"]),
+        aspect=DataAspect(),
 		yticks=(1:2, reverse(["immiscible", "miscible"])),
         yticklabelrotation=π/2
 	)
-	hm = heatmap!(cm_to_plot,
-		colormap=ColorSchemes.algae,
-		colorrange=(0, maximum(cm))
+
+    # make negative to use negative region of colormap
+    cm_to_plot[1, 2] = -cm_to_plot[1, 2]
+    cm_to_plot[2, 1] = -cm_to_plot[2, 1]
+    hm = heatmap!(cm_to_plot,
+		colormap=ColorSchemes.diverging_gwr_55_95_c38_n256,
+        colorrange=(-maximum(abs.(cm)), maximum(abs.(cm)))
 	)
+    
+    cm_to_plot[1, 2] = -cm_to_plot[1, 2]
+    cm_to_plot[2, 1] = -cm_to_plot[2, 1]
 	for i = 1:2
         for j = 1:2
             text!("$(round(Int, cm_to_plot[i, j]))",
-                  position=(i, j), align=(:center, :center), color="white",
+                  position=(i, j), align=(:center, :center), color="black",
 				  fontsize=50
 			)
         end
     end
-    Colorbar(fig[1, 2], hm, label="# pairs")
+    #Colorbar(fig[1, 2], hm, label="# pairs")
+    resize_to_layout!(fig)
     if save_fig
         save("confusion_matrix.pdf", fig)
     end
