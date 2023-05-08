@@ -47,7 +47,7 @@ TableOfContents()
 md"# read in raw data"
 
 # ╔═╡ 11ed0c10-24d7-4c4e-a9f3-4625d96ee7ff
-raw_data = retreive_raw_data()
+const raw_data = retreive_raw_data()
 
 # ╔═╡ 2090c5f8-cd9c-4bd5-abd5-b5724420c940
 raw_data.X
@@ -67,6 +67,9 @@ sum(raw_data.M_complete .== 1) / 2 - raw_data.n_compounds # number miscible
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
 viz_miscibility_matrix(raw_data.M_complete, raw_data)
 
+# ╔═╡ dd2ea5be-c2f0-4260-8e3a-0129c9ec1351
+md"### viz graph"
+
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
 
@@ -74,7 +77,7 @@ md"# introduce missing values"
 θ = 0.4 # fraction missing
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
-data = sim_data_collection(θ, raw_data, weigh_classes=false)
+data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
 
 # ╔═╡ e292d20e-9031-4276-87fb-b59685db2f72
 length(data.ids_obs)
@@ -112,18 +115,16 @@ perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyp
 fig_losses
 
 # ╔═╡ 925791d7-3dee-4d6b-9baa-9ee85afb487c
-md"## train model with opt hyper-params
-
-TODO: study sensitivity w.r.t. loss"
+md"## train model with opt hyper-params"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.01 / 1.5)
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.006)
 
 # ╔═╡ 2533b992-e881-417e-ba9b-7c3555751340
 losses[end]
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
-viz_loss(losses) # TODO ask Joshua
+viz_loss(losses)
 
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 begin
@@ -163,6 +164,9 @@ baseline = test_perf_baseline_model(data, raw_data, set_opt_cutoff=true)
 
 # ╔═╡ f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
 viz_confusion(Float64.(baseline.cm) / 2)
+
+# ╔═╡ 3c615c48-fb1e-4dfc-9db6-7bd4fa570443
+baseline.cm / 2
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
@@ -224,6 +228,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═c4a26802-2a30-4b8e-b057-2fce989f0aa0
 # ╠═e6a9d962-21c3-4823-85f4-1dc11a19a251
 # ╠═f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
+# ╟─dd2ea5be-c2f0-4260-8e3a-0129c9ec1351
 # ╟─cdf7421a-aed6-47fb-aac7-74136355a0d3
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
@@ -248,6 +253,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╟─1ce32f38-22e1-43a1-8aa8-49141573208c
 # ╠═ea729838-bdd8-4e17-823d-ac027de562c8
 # ╠═f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
+# ╠═3c615c48-fb1e-4dfc-9db6-7bd4fa570443
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
