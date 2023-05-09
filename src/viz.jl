@@ -8,14 +8,19 @@ miscibility_colormap = reverse(ColorSchemes.turbid)
 function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
     big_fontsize = 50
 
-	fig = Figure(resolution=(1400, 1400))
+    the_compound_labels = rich.(raw_data.compounds)
+    # subscripts
+    the_compound_labels[findfirst(raw_data.compounds .== "K2HPO4")] = rich("K", subscript("2"), "HPO", subscript("4"))
+    the_compound_labels[findfirst(raw_data.compounds .== "Na2HPO4")] = rich("Na", subscript("2"), "HPO", subscript("4"))
+
+	fig = Figure(resolution=(1450, 1450))
 	ax  = Axis(fig[1, 1], 
 		xlabel="compound", ylabel="compound", 
 		xgridvisible=false, 
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
 		ygridvisible=false, 
-        xticks=(1:raw_data.n_compounds, raw_data.compounds),
+        xticks=(1:raw_data.n_compounds, the_compound_labels),
         yticks=(1:raw_data.n_compounds, reverse(raw_data.compounds)),
 		xticklabelrotation=π/2
 	)
@@ -41,12 +46,13 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
         for c in unique(raw_data.classes) # loop thru classes
             l = sum(raw_data.classes .== c) # number of instances of this class
 
-            # draw brackets on bottom
+            # draw brackets on top
             bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8, 
                      font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
 
-            # draw brackets on top
-            bracket!(r_ax, 0, c0 + 0.5, 0, c0 + l - 0.5, orientation=:down, fontsize=big_fontsize/1.8, 
+            # draw brackets on right
+            bracket!(r_ax, 0, raw_data.n_compounds + 1 - (c0 + l) + 0.5, 0, raw_data.n_compounds + 1 - c0 - 0.5, 
+                     orientation=:down, fontsize=big_fontsize/1.8, 
                      font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
             
             c0 += l
