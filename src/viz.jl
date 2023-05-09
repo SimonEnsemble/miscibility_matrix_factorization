@@ -1,9 +1,14 @@
-class_to_color = Dict(zip(["Polymer", "Protein", "Surfactant", "Salt"], ColorSchemes.seaborn_bright[1:4]))
 class_to_marker = Dict("Polymer"    => :circle,
 					   "Protein"    => :rect,
 					   "Surfactant" => :diamond,
 					   "Salt"       => :cross)
-miscibility_colormap = reverse(ColorSchemes.turbid)
+class_to_color = Dict(zip(["Polymer", "Protein", "Salt", "Surfactant"],
+                          [RGB(0.0, 0.74736935, 1.0),
+                           RGB(0.83092886, 0.7934697, 0.22566332),
+                           RGB(1.0, 0.426407, 0.681544),
+                           RGB(0.0, 0.71687746, 0.55441886)])) # from gadfly
+# a = RGB.(Gadfly.Scale.color_discrete_hue().f(4))
+miscibility_colormap = reverse(ColorSchemes.:batlow)
 
 function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
     big_fontsize = 50

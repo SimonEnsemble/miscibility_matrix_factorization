@@ -85,8 +85,14 @@ length(data.ids_obs)
 # ╔═╡ 6991d2b0-73df-4b09-aadf-a5877fa5aa5a
 length(data.ids_missing)
 
+# ╔═╡ 436164ee-01b8-46ad-9e96-5e72368444d4
+the_compound_labels = rich.(raw_data.compounds)
+
 # ╔═╡ 8d1b193b-a66c-4f37-80ae-7083f93ceb78
 viz_miscibility_matrix(data.M, raw_data, draw_brackets=true)
+
+# ╔═╡ 86e8f156-dd43-496c-b040-b4772fe0c536
+raw_data.classes
 
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
@@ -233,8 +239,7 @@ begin
 					medianlinewidth=2, mediancolor="black", color=model_to_color[model])#, color = map(d -> dodge_to_color[d], dodge))
 			end
 		end
-		
-	
+		save("balanced_acc.pdf", fig)
 		return fig
 	end
 
@@ -277,7 +282,9 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
 # ╠═e292d20e-9031-4276-87fb-b59685db2f72
 # ╠═6991d2b0-73df-4b09-aadf-a5877fa5aa5a
+# ╠═436164ee-01b8-46ad-9e96-5e72368444d4
 # ╠═8d1b193b-a66c-4f37-80ae-7083f93ceb78
+# ╠═86e8f156-dd43-496c-b040-b4772fe0c536
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
 # ╠═5b7bcc88-3048-4701-9349-6de5db12be92
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
