@@ -112,7 +112,7 @@ hyperparams_cv = [(
 	λ=rand(),
 	σ=nothing, 
 	use_features=false)
-			   for _ = 1:5]
+			   for _ = 1:25]
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
 perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
