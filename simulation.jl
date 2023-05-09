@@ -19,7 +19,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie
+	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes
 	using MiscibilityMF
 end
 
@@ -86,7 +86,7 @@ length(data.ids_obs)
 length(data.ids_missing)
 
 # ╔═╡ 8d1b193b-a66c-4f37-80ae-7083f93ceb78
-viz_miscibility_matrix(data.M, raw_data, draw_brackets=false)
+viz_miscibility_matrix(data.M, raw_data, draw_brackets=true)
 
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
@@ -198,6 +198,49 @@ if do_multiple_runs
 	end
 end
 
+# ╔═╡ 43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
+begin
+	function balanced_acc_boxplot(θs, θ_to_perf)
+		models = ["GR-MF", "MF", "RF"]
+		model_to_dodge = Dict(zip(models, 1:length(models)))
+		model_to_color = Dict(zip(models, ColorSchemes.Accent_3))
+
+		# panel for each θ.
+		fig = Figure(resolution=(600, 400))
+		axs = [Axis(fig[1, i], 
+					xlabel=i == 2 ? "model" : "", 
+					ylabel=i == 1 ? "balanced accuracy" : "",
+					xticks=(1:3, models),
+					title="θ = $(θs[i])"
+				)
+				for i = 1:length(θs)
+		]
+		linkyaxes!(axs...)
+		ylims!(0.4, 1)
+		hideydecorations!(axs[2])
+		hideydecorations!(axs[3])
+		hidespines!(axs[2], :l)
+		hidespines!(axs[3], :l)
+		for (i, θ) in enumerate(θs)
+			# get data, but only balanced acc
+			perf_this_theta = deepcopy(θ_to_perf[θ])
+			filter!(row -> row["metric"] == "balanced_accuracy", perf_this_theta)
+			for model in models
+				d = filter(row -> row["model"] == model, perf_this_theta)
+				xs = [model_to_dodge[model] for _ = 1:nrow(d)]
+				ys = d[:, "score"]
+				boxplot!(axs[i], xs, ys, 
+					medianlinewidth=2, mediancolor="black", color=model_to_color[model])#, color = map(d -> dodge_to_color[d], dodge))
+			end
+		end
+		
+	
+		return fig
+	end
+
+	balanced_acc_boxplot(θs, θ_to_perf)
+end
+
 # ╔═╡ d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
 function viz_hyperparam(hp::Symbol, perf_data::DataFrame)# performance
 	return Gadfly.plot(filter(row -> row["metric"] == "f1", perf_data), y=hp, x=:model, color=:model,
@@ -259,6 +302,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
 # ╠═ea48a8dd-d504-4025-bab4-b2f57e1fd256
 # ╠═5906e98f-2d7d-4416-abf0-7d64e927bb40
+# ╠═43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
 # ╠═d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
 # ╠═3c8a8663-d588-44b8-a244-e84e7ef964dc
 # ╠═c09d65a7-3457-4a5a-8521-d01513797dd2
