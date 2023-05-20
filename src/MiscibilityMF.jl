@@ -1,7 +1,7 @@
 module MiscibilityMF
 
 using CSV, DataFrames, Statistics, LogExpFunctions, LinearAlgebra, Random, 
-      StatsBase, ScikitLearn, Distributions, KernelFunctions, CairoMakie, ColorSchemes
+      StatsBase, ScikitLearn, Distributions, KernelFunctions, CairoMakie, ColorSchemes, Colors
 
 import MLJBase: partition, StratifiedCV, train_test_pairs
 
