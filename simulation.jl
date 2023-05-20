@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.20
+# v0.19.26
 
 using Markdown
 using InteractiveUtils
@@ -19,7 +19,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes
+	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random
 	using MiscibilityMF
 end
 
@@ -103,16 +103,15 @@ to handle imbalanced, classes: do not weigh classes, rather adjust threshold for
 "
 
 # ╔═╡ 5b7bcc88-3048-4701-9349-6de5db12be92
-nb_epochs = 250
+nb_epochs = 350
 
 # ╔═╡ 024ce284-90f3-43e6-b701-1f13d209462f
-hyperparams_cv = [(
-	k=rand([2, 3]), 
-	γ=rand(Uniform(0, 0.1)),
-	λ=rand(),
-	σ=nothing, 
-	use_features=false)
-			   for _ = 1:25]
+begin
+	Random.seed!(97331)
+	nb_hyperparams = 25
+	
+	hyperparams_cv = gen_hyperparams(nb_hyperparams, true) # 2nd arg is graph reg
+end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
 perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
@@ -187,7 +186,7 @@ md"# multiple runs and sparsities"
 if do_multiple_runs
 	θ_to_perf = Dict()
 	@showprogress for θ in θs
-		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=15)
+		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=nb_hyperparams)
 	end
 end
 
@@ -204,45 +203,46 @@ if do_multiple_runs
 	end
 end
 
-# ╔═╡ 43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
-begin
-	function balanced_acc_boxplot(θs, θ_to_perf)
-		models = ["GR-MF", "MF", "RF"]
-		model_to_dodge = Dict(zip(models, 1:length(models)))
-		model_to_color = Dict(zip(models, ColorSchemes.Accent_3))
+# ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
+function balanced_acc_boxplot(θs, θ_to_perf)
+	models = ["GR-MF", "MF", "RF"]
+	model_to_dodge = Dict(zip(models, 1:length(models)))
+	model_to_color = Dict(zip(models, ColorSchemes.Accent_3))
 
-		# panel for each θ.
-		fig = Figure(resolution=(600, 400))
-		axs = [Axis(fig[1, i], 
-					xlabel=i == 2 ? "model" : "", 
-					ylabel=i == 1 ? "balanced accuracy" : "",
-					xticks=(1:3, models),
-					title="θ = $(θs[i])"
-				)
-				for i = 1:length(θs)
-		]
-		linkyaxes!(axs...)
-		ylims!(0.4, 1)
-		hideydecorations!(axs[2])
-		hideydecorations!(axs[3])
-		hidespines!(axs[2], :l)
-		hidespines!(axs[3], :l)
-		for (i, θ) in enumerate(θs)
-			# get data, but only balanced acc
-			perf_this_theta = deepcopy(θ_to_perf[θ])
-			filter!(row -> row["metric"] == "balanced_accuracy", perf_this_theta)
-			for model in models
-				d = filter(row -> row["model"] == model, perf_this_theta)
-				xs = [model_to_dodge[model] for _ = 1:nrow(d)]
-				ys = d[:, "score"]
-				boxplot!(axs[i], xs, ys, 
-					medianlinewidth=2, mediancolor="black", color=model_to_color[model])#, color = map(d -> dodge_to_color[d], dodge))
-			end
+	# panel for each θ.
+	fig = Figure(resolution=(600, 400))
+	axs = [Axis(fig[1, i], 
+				xlabel=i == 2 ? "model" : "", 
+				ylabel=i == 1 ? "balanced accuracy" : "",
+				xticks=(1:3, models),
+				title="θ = $(θs[i])"
+			)
+			for i = 1:length(θs)
+	]
+	linkyaxes!(axs...)
+	ylims!(0.4, 1)
+	hideydecorations!(axs[2])
+	hideydecorations!(axs[3])
+	hidespines!(axs[2], :l)
+	hidespines!(axs[3], :l)
+	for (i, θ) in enumerate(θs)
+		# get data, but only balanced acc
+		perf_this_theta = deepcopy(θ_to_perf[θ])
+		filter!(row -> row["metric"] == "balanced_accuracy", perf_this_theta)
+		for model in models
+			d = filter(row -> row["model"] == model, perf_this_theta)
+			xs = [model_to_dodge[model] for _ = 1:nrow(d)]
+			ys = d[:, "score"]
+			boxplot!(axs[i], xs, ys, 
+				medianlinewidth=2, mediancolor="black", color=model_to_color[model])#, color = map(d -> dodge_to_color[d], dodge))
 		end
-		save("balanced_acc.pdf", fig)
-		return fig
 	end
+	save("balanced_acc.pdf", fig)
+	return fig
+end
 
+# ╔═╡ 43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
+if do_multiple_runs
 	balanced_acc_boxplot(θs, θ_to_perf)
 end
 
@@ -255,13 +255,19 @@ function viz_hyperparam(hp::Symbol, perf_data::DataFrame)# performance
 end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
-viz_hyperparam(:λ, θ_to_perf[0.2])
+if do_multiple_runs
+	viz_hyperparam(:λ, θ_to_perf[0.2])
+end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
-viz_hyperparam(:γ, θ_to_perf[0.2])
+if do_multiple_runs
+	viz_hyperparam(:γ, θ_to_perf[0.2])
+end
 
 # ╔═╡ f37c6347-17fe-4166-bcad-3f5951c70dcb
-viz_hyperparam(:k, θ_to_perf[0.2])
+if do_multiple_runs
+	viz_hyperparam(:k, θ_to_perf[0.2])
+end
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -309,6 +315,7 @@ viz_hyperparam(:k, θ_to_perf[0.2])
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
 # ╠═ea48a8dd-d504-4025-bab4-b2f57e1fd256
 # ╠═5906e98f-2d7d-4416-abf0-7d64e927bb40
+# ╠═cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 # ╠═43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
 # ╠═d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
 # ╠═3c8a8663-d588-44b8-a244-e84e7ef964dc

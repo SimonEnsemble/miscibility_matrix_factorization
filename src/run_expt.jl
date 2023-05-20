@@ -1,3 +1,13 @@
+function gen_hyperparams(nb_hyperparams::Int, graph_regularization::Bool)
+    return [(
+        k=rand([2, 3]),
+        γ=graph_regularization ? rand(Uniform(0, 0.1)) : 0.0,
+        λ=rand(),
+        σ=nothing,
+        use_features=false)
+           for _ = 1:nb_hyperparams]
+end
+
 function run_experiment(data::MiscibilityData,
                         raw_data::RawData,
                         graph_regularization::Bool,
@@ -6,13 +16,7 @@ function run_experiment(data::MiscibilityData,
                         nb_epochs::Int=250
 )
     # create list of hyperparams to explore.
-	hyperparams_cv = [(
-			k=rand([2, 3]), 
-			γ=graph_regularization ? rand(Uniform(0, 0.1)) : 0.0,
-			λ=rand(),
-			σ=nothing, 
-			use_features=false)
-			   for _ = 1:nb_hyperparams]
+    hyperparams_cv = gen_hyperparams(nb_hyperparams, graph_regularization)
 
     # conduct hyper-param optimization viz K-folds cross validation on training data
     perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(
