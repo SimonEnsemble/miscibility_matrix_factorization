@@ -88,28 +88,7 @@ md"# introduce missing values"
 data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
 
 # ╔═╡ 377d754f-c6cb-48c6-8ce4-1fe3335a23a1
-fraction_miscible = mean([data.M[i, j] for (i, j) in data.ids_obs])
-
-# ╔═╡ c44c0475-f5f2-4a6c-9ba0-2d4eb1432c65
-diagonal(raw_data.M_complete)
-
-# ╔═╡ 83fb5b8f-ec45-4c02-b1b0-415cf12c5a32
-sum(raw_data.M_complete .== 1)
-
-# ╔═╡ d543dc27-5036-4f09-8c59-5827c2b9eeb6
-sum(raw_data.M_complete .== 0)
-
-# ╔═╡ 4fe80c59-9ecc-4915-988a-8bfcb4b9b906
-sum([raw_data.M_complete[i, j] for (i, j) in data.ids_obs] .== 0)
-
-# ╔═╡ 75d86f68-459e-4c83-9565-7d93fe242f24
-raw_data.n_compounds^2
-
-# ╔═╡ 32fe178d-b9c3-4e02-ab0a-be00ef6a7114
-sum([data.M[i, j] for (i, j) in data.ids_obs] .== 0)
-
-# ╔═╡ d280af72-5ac9-4da8-ac13-b852a11feedd
-
+mean([data.M[i, j] for (i, j) in data.ids_obs]) # fraction miscible
 
 # ╔═╡ e292d20e-9031-4276-87fb-b59685db2f72
 length(data.ids_obs)
@@ -321,13 +300,6 @@ end
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
 # ╠═377d754f-c6cb-48c6-8ce4-1fe3335a23a1
-# ╠═c44c0475-f5f2-4a6c-9ba0-2d4eb1432c65
-# ╠═83fb5b8f-ec45-4c02-b1b0-415cf12c5a32
-# ╠═d543dc27-5036-4f09-8c59-5827c2b9eeb6
-# ╠═4fe80c59-9ecc-4915-988a-8bfcb4b9b906
-# ╠═75d86f68-459e-4c83-9565-7d93fe242f24
-# ╠═32fe178d-b9c3-4e02-ab0a-be00ef6a7114
-# ╠═d280af72-5ac9-4da8-ac13-b852a11feedd
 # ╠═e292d20e-9031-4276-87fb-b59685db2f72
 # ╠═6991d2b0-73df-4b09-aadf-a5877fa5aa5a
 # ╠═436164ee-01b8-46ad-9e96-5e72368444d4
