@@ -223,13 +223,13 @@ function viz_category_miscibility(raw_data::RawData)
 	fig = Figure()
 	ax  = Axis(fig[1, 1],
         xlabel="category", ylabel="category",
-        xticks=(1:4, compound_categories),
+        xticks=(1:4, lowercase.(compound_categories)),
         aspect=DataAspect(),
-        yticks=(1:4, reverse(compound_categories)),
+        yticks=(1:4, reverse(lowercase.(compound_categories))),
         yticklabelrotation=π/2
     )
 	hm = heatmap!(M_categories_plt,
-		colormap=reverse(ColorSchemes.viridis), colorrange=(0, 1))
+		colormap=ColorSchemes.viridis, colorrange=(0, 1))
 
 	for i = 1:4
         for j = 1:4
@@ -242,5 +242,6 @@ function viz_category_miscibility(raw_data::RawData)
         end
     end
 	Colorbar(fig[1, 2], hm, label="fraction miscible")
+    save("category_based_miscibility.pdf", fig)
 	return fig
 end

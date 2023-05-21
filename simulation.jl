@@ -299,7 +299,7 @@ end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
 if do_multiple_runs
-	viz_hyperparam(:λ, θ_to_perf[0.5])
+	viz_hyperparam(:λ, θ_to_perf[0.8])
 end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
