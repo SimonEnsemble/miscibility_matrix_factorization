@@ -110,17 +110,17 @@ md"# dev model
 
 to handle imbalanced, classes: adjust threshold for balanced accuracy. 
 
-set learning rate:
+set learning rate and number of epochs for gradient descent.
 "
 
 # ╔═╡ abbb1485-8652-4cc5-b749-ab93db6b64fc
-α = 0.0065
+begin
+	α = 0.006
+	nb_epochs = 350
+end
 
 # ╔═╡ ff07a8bf-4fe4-46ca-a929-d64b557903d6
 md"## hyper-param search"
-
-# ╔═╡ 5b7bcc88-3048-4701-9349-6de5db12be92
-nb_epochs = 350
 
 # ╔═╡ 024ce284-90f3-43e6-b701-1f13d209462f
 begin
@@ -131,7 +131,10 @@ begin
 end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, record_loss=true)
+perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, record_loss=true)
+
+# ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
+perf_metrics[:, opt_hps_id] # best cross-validation perf
 
 # ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
 fig_losses
@@ -143,7 +146,7 @@ md"## train model with opt hyper-params"
 model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α)
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
-viz_loss(losses)
+viz_loss(losses, save_fig=true)
 
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 begin
@@ -212,8 +215,8 @@ md"# multiple runs and sparsities"
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
 begin
 	θs = [0.2, 0.5, 0.8]
-	αs = [0.005, 0.007, 0.02] # need to change learning rate for diff θ
-	nruns = 2
+	αs = [0.005, 0.008, 0.02] # need to change learning rate for diff θ
+	nruns = 10
 end
 
 # ╔═╡ ea48a8dd-d504-4025-bab4-b2f57e1fd256
@@ -255,7 +258,7 @@ function balanced_acc_boxplot(θs, θ_to_perf)
 			for i = 1:length(θs)
 	]
 	linkyaxes!(axs...)
-	ylims!(0.4, 1)
+	ylims!(0.39, 1)
 	hideydecorations!(axs[2])
 	hideydecorations!(axs[3])
 	hidespines!(axs[2], :l)
@@ -293,7 +296,7 @@ end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
 if do_multiple_runs
-	viz_hyperparam(:λ, θ_to_perf[0.8])
+	viz_hyperparam(:λ, θ_to_perf[0.5])
 end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
@@ -334,9 +337,9 @@ end
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
 # ╠═abbb1485-8652-4cc5-b749-ab93db6b64fc
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
-# ╠═5b7bcc88-3048-4701-9349-6de5db12be92
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
+# ╠═b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
 # ╠═a3457343-dc4d-4046-83d3-b7bdc20c427c
