@@ -173,16 +173,33 @@ perf.cm
 viz_confusion(perf.cm, save_fig=true)
 
 # ╔═╡ 1ce32f38-22e1-43a1-8aa8-49141573208c
-md"## baseline model"
+md"## baseline model
+
+(random forest)
+"
 
 # ╔═╡ ea729838-bdd8-4e17-823d-ac027de562c8
 baseline = test_perf_baseline_model(data, raw_data, set_opt_cutoff=true)
 
 # ╔═╡ f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
-viz_confusion(Float64.(baseline.cm) / 2)
+viz_confusion(Float64.(baseline.cm) / 2) # divide by two b.c doubled
 
-# ╔═╡ 3c615c48-fb1e-4dfc-9db6-7bd4fa570443
-baseline.cm / 2
+# ╔═╡ 1592a5c8-100d-44f5-b48c-2ced1fe601f2
+md"(random guessing)"
+
+# ╔═╡ 9e0e2df4-e71b-4fe7-ab63-e7c3402756df
+baseline_guessing = test_perf_guessing(data, raw_data)
+
+# ╔═╡ 2b00c2ae-ceba-4fcd-8ea5-9dae2013ee2b
+viz_confusion(baseline_guessing.cm)
+
+# ╔═╡ 19d0a18c-ad97-4f76-8cb5-fb3b0cc830d3
+begin
+	# check confusion matrix
+	@assert length(data.ids_missing) == sum(baseline_guessing.cm)
+	@assert sum([raw_data.M_complete[i, j] for (i, j) in data.ids_missing] .== 1) == sum(baseline_guessing.cm[2, :]) # sum of second row is truly miscible
+	@assert sum([raw_data.M_complete[i, j] for (i, j) in data.ids_missing] .== 0) == sum(baseline_guessing.cm[1, :]) # sum of first row is truly immisible
+end
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
@@ -323,7 +340,10 @@ end
 # ╟─1ce32f38-22e1-43a1-8aa8-49141573208c
 # ╠═ea729838-bdd8-4e17-823d-ac027de562c8
 # ╠═f78eccb9-a59f-4d05-a477-bd5ca7ae2e24
-# ╠═3c615c48-fb1e-4dfc-9db6-7bd4fa570443
+# ╟─1592a5c8-100d-44f5-b48c-2ced1fe601f2
+# ╠═9e0e2df4-e71b-4fe7-ab63-e7c3402756df
+# ╠═2b00c2ae-ceba-4fcd-8ea5-9dae2013ee2b
+# ╠═19d0a18c-ad97-4f76-8cb5-fb3b0cc830d3
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f

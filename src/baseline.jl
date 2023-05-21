@@ -71,3 +71,18 @@ function test_perf_baseline_model(
             cutoff=cutoff
 	)
 end
+
+function test_perf_guessing(data::MiscibilityData, raw_data::RawData)
+    θ_miscible = mean([data.M[i, j] for (i, j) in data.ids_obs])
+	
+    m = [raw_data.M_complete[i, j] for (i, j) in data.ids_missing]
+    m̂ = [rand() < θ_miscible for (i, j) in data.ids_missing]
+
+	return (f1=f1_score(m, m̂),
+		    accuracy=accuracy_score(m, m̂),
+	        precision=precision_score(m, m̂),
+		    recall=recall_score(m, m̂),
+            balanced_accuracy=balanced_accuracy_score(m, m̂),
+            cm=confusion_matrix(m, m̂)
+	)
+end

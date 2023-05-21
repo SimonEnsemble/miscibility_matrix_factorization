@@ -30,6 +30,6 @@ export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData
        do_hyperparam_optimization, # hyperparam_opt.jl
        set_opt_cutoff!, # set_cutoff.jl
        viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, class_to_color, # viz.jl
-       build_Xy, test_perf_baseline_model, # baseline.jl
+       build_Xy, test_perf_baseline_model, test_perf_guessing, # baseline.jl
        gen_hyperparams, run_experiment, run_experiments # run_expt.jl
 end
