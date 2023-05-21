@@ -108,10 +108,16 @@ raw_data.classes
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
 
-to handle imbalanced, classes: do not weigh classes, rather adjust threshold for balanced accuracy. 
+to handle imbalanced, classes: adjust threshold for balanced accuracy. 
 
-## hyper-param search
+set learning rate:
 "
+
+# ╔═╡ abbb1485-8652-4cc5-b749-ab93db6b64fc
+α = 0.0065
+
+# ╔═╡ ff07a8bf-4fe4-46ca-a929-d64b557903d6
+md"## hyper-param search"
 
 # ╔═╡ 5b7bcc88-3048-4701-9349-6de5db12be92
 nb_epochs = 350
@@ -125,7 +131,7 @@ begin
 end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
+perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, record_loss=true)
 
 # ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
 fig_losses
@@ -134,10 +140,7 @@ fig_losses
 md"## train model with opt hyper-params"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.0065)
-
-# ╔═╡ 2533b992-e881-417e-ba9b-7c3555751340
-losses[end]
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α)
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
 viz_loss(losses)
@@ -145,7 +148,6 @@ viz_loss(losses)
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 begin
 	set_opt_cutoff!(model, raw_data, data.ids_obs)
-	# was 0.605
 end
 
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
@@ -208,13 +210,18 @@ md"# multiple runs and sparsities"
 @bind do_multiple_runs CheckBox(default=false)
 
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
-θs = [0.2, 0.5, 0.8]
+begin
+	θs = [0.2, 0.5, 0.8]
+	αs = [0.005, 0.007, 0.02] # need to change learning rate for diff θ
+	nruns = 2
+end
 
 # ╔═╡ ea48a8dd-d504-4025-bab4-b2f57e1fd256
 if do_multiple_runs
 	θ_to_perf = Dict()
-	@showprogress for θ in θs
-		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns=10, nb_hyperparams=nb_hyperparams)
+	@showprogress for (θ, α) in zip(θs, αs)
+		mf_settings = (; α=α, nb_hyperparams=nb_hyperparams, nb_epochs=nb_epochs)
+		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns, mf_settings)
 	end
 end
 
@@ -233,16 +240,16 @@ end
 
 # ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 function balanced_acc_boxplot(θs, θ_to_perf)
-	models = ["GR-MF", "MF", "RF"]
+	models = ["GR-MF", "MF", "RF", "guess"]
 	model_to_dodge = Dict(zip(models, 1:length(models)))
-	model_to_color = Dict(zip(models, ColorSchemes.Accent_3))
+	model_to_color = Dict(zip(models, ColorSchemes.Accent_4))
 
 	# panel for each θ.
-	fig = Figure(resolution=(600, 400))
+	fig = Figure(resolution=(700, 400))
 	axs = [Axis(fig[1, i], 
 				xlabel=i == 2 ? "model" : "", 
 				ylabel=i == 1 ? "balanced accuracy" : "",
-				xticks=(1:3, models),
+				xticks=(1:length(models), models),
 				title="θ = $(θs[i])"
 			)
 			for i = 1:length(θs)
@@ -276,7 +283,9 @@ end
 
 # ╔═╡ d9ae5b52-22c1-4559-9084-ec38bf3fb4a7
 function viz_hyperparam(hp::Symbol, perf_data::DataFrame)# performance
-	return Gadfly.plot(filter(row -> row["metric"] == "f1", perf_data), y=hp, x=:model, color=:model,
+	return Gadfly.plot(
+		filter(row -> row["metric"] == "f1", perf_data), 
+		y=hp, x=:model, color=:model,
 		Gadfly.Geom.beeswarm
 		# Gadfly.Coord.cartesian(ymin=0.4, ymax=1.0)
 	)
@@ -323,13 +332,14 @@ end
 # ╠═8d1b193b-a66c-4f37-80ae-7083f93ceb78
 # ╠═86e8f156-dd43-496c-b040-b4772fe0c536
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
+# ╠═abbb1485-8652-4cc5-b749-ab93db6b64fc
+# ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
 # ╠═5b7bcc88-3048-4701-9349-6de5db12be92
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
 # ╠═a3457343-dc4d-4046-83d3-b7bdc20c427c
-# ╠═2533b992-e881-417e-ba9b-7c3555751340
 # ╠═a58e7958-458f-4900-8de3-f4eeae945710
 # ╠═33e459c3-0d6a-4999-816f-54069bbad86f
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f

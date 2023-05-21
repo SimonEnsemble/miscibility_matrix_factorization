@@ -11,19 +11,22 @@ end
 function run_experiment(data::MiscibilityData,
                         raw_data::RawData,
                         graph_regularization::Bool,
-                        nb_hyperparams::Int=10;
-                        nfolds::Int=3,
-                        nb_epochs::Int=250
+                        mf_settings::NamedTuple
 )
+    # unpack mf settings
+    nb_hyperparams = mf_settings.nb_hyperparams
+    nb_epochs = mf_settings.nb_epochs
+    α = mf_settings.α
+
     # create list of hyperparams to explore.
     hyperparams_cv = gen_hyperparams(nb_hyperparams, graph_regularization)
 
     # conduct hyper-param optimization viz K-folds cross validation on training data
     perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(
-		data, hyperparams_cv, raw_data, nb_epochs=nb_epochs)
+		data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α)
 
     # train deployment model on all training data with opt hyper-params
-	model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs,
+	model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, α=α,
 		record_loss=false)
 
     set_opt_cutoff!(model, raw_data, data.ids_obs)
@@ -38,13 +41,12 @@ function run_experiment(data::MiscibilityData,
     )
 end
 
-function run_experiments(θ::Float64, raw_data::RawData;
-				  		 nruns::Int=3,
-				         nb_hyperparams::Int=10
-)
-
+function run_experiments(θ::Float64, raw_data::RawData, nruns::Int, mf_settings::NamedTuple)
 	perf_data = DataFrame()
 	all_metrics = [:f1, :accuracy, :precision, :recall, :balanced_accuracy]
+    nb_hyperparams = mf_settings.nb_hyperparams
+    nb_epochs = mf_settings.nb_epochs
+    α = mf_settings.α
 
 	for r = 1:nruns
 		println("run #$r/$nruns")
@@ -55,7 +57,7 @@ function run_experiments(θ::Float64, raw_data::RawData;
 
 		### train the models.
 		graph_regularization = true
-		res = run_experiment(data, raw_data, graph_regularization, nb_hyperparams)
+		res = run_experiment(data, raw_data, graph_regularization, mf_settings)
 		for met in all_metrics # this way for Gadfly to work
 			push!(perf_data, (run=r,
                               model="GR-MF",
@@ -72,7 +74,7 @@ function run_experiments(θ::Float64, raw_data::RawData;
 
 		# turn off graph regularization
 		graph_regularization = false
-		res = run_experiment(data, raw_data, graph_regularization, nb_hyperparams)
+		res = run_experiment(data, raw_data, graph_regularization, mf_settings)
 		for met in all_metrics # this way for Gadfly to work
 			push!(perf_data, (run=r,
                               model="MF",
@@ -99,7 +101,25 @@ function run_experiments(θ::Float64, raw_data::RawData;
 						      k=NaN,
 						      γ=NaN,
 				 			  λ=NaN,
-							  cutoff=baseline[:cutoff]), promote=true
+							  cutoff=baseline[:cutoff]),
+                  promote=true
+			)
+		end
+
+        # random guessing
+        baseline_guessing = test_perf_guessing(data, raw_data)
+		for met in all_metrics # this way for Gadfly to work
+			push!(perf_data, (run=r,
+                              model="guess",
+							  # this metric
+				 			  score=baseline_guessing[met],
+						      metric=String(met),
+							  # opt hyperparams
+						      k=NaN,
+						      γ=NaN,
+				 			  λ=NaN,
+							  cutoff=NaN), 
+                  promote=true
 			)
 		end
 	end
