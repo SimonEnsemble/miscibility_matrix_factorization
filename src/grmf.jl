@@ -20,11 +20,12 @@ function loss(data::MiscibilityData, model::MFModel, K::Matrix{Float64})
 	# latent vectors are columns of C
 	@assert size(model.C)[2] == size(data.M)[1] == size(data.M)[2]
 
-	# cross-entropy loss expressing mismatch over observations
-	l = 0.0
+	l_ce = 0.0 # cross entropy term
+    l_nr = 0.0 # norm regularization term
+    l_gr = 0.0 # graph-regularization term
 	for i = 1:data.n_compounds
         # regularization of latent vector
-		l += model.λ * sum(model.C[:, i] .^ 2) 
+		l_nr += model.λ * sum(model.C[:, i] .^ 2) 
 		for j = (i+1):data.n_compounds
 			###
 			#    graph-regularization term
@@ -32,7 +33,7 @@ function loss(data::MiscibilityData, model::MFModel, K::Matrix{Float64})
 			###
 			cᵢ = model.C[:, i]
 			cⱼ = model.C[:, j]
-			l += model.γ * K[i, j] * sum((cᵢ - cⱼ) .^ 2)
+			l_gr += model.γ * K[i, j] * sum((cᵢ - cⱼ) .^ 2)
 
 			###
 			#    mis-match term
@@ -47,11 +48,11 @@ function loss(data::MiscibilityData, model::MFModel, K::Matrix{Float64})
 
 				# increment mismatch loss. wt by class.
 				wt = data.class_wt[mᵢⱼ]
-				l -= (mᵢⱼ * log(m̂ᵢⱼ) + (1 - mᵢⱼ) * log(1 - m̂ᵢⱼ)) * wt
+				l_ce -= (mᵢⱼ * log(m̂ᵢⱼ) + (1 - mᵢⱼ) * log(1 - m̂ᵢⱼ)) * wt
 			end
 		end
 	end
-	return l
+    return l_ce + l_nr + l_ce
 end
 
 function ∇_cᵢ(data::MiscibilityData, model::MFModel, c::Int, K::Matrix{Float64})
@@ -138,10 +139,13 @@ function construct_train_model(hyperparams::NamedTuple,
         K = class_similarity_matrix(raw_data)
     end
 
+    # scale learning rate with fraction missing entries
+    θ̃ = (sum(ismissing.(data.M))) / (prod(size(data.M)) - size(data.M)[1])
+
 	# gradient descent epochs. keep track of loss.
 	losses = [NaN for _ = 1:nb_epochs]
 	for s = 1:nb_epochs
-		grad_descent_epoch!(data, model, K, α=α)
+		grad_descent_epoch!(data, model, K, α=α * θ̃) # scale learning rate
         if record_loss
             losses[s] = loss(data, model, K)
         end

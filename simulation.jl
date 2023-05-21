@@ -85,7 +85,7 @@ viz_category_miscibility(raw_data)
 md"# introduce missing values"
 
 # ╔═╡ 6a1a696c-88e5-46b3-abcc-376ec8099d90
-θ = 0.4 # fraction missing
+θ = 0.8 # fraction missing
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
 data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
@@ -118,7 +118,7 @@ set learning rate and number of epochs for gradient descent.
 
 # ╔═╡ abbb1485-8652-4cc5-b749-ab93db6b64fc
 begin
-	α = 0.006
+	α = 0.025
 	nb_epochs = 350
 end
 
@@ -218,7 +218,8 @@ md"# multiple runs and sparsities"
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
 begin
 	θs = [0.2, 0.5, 0.8]
-	αs = [0.005, 0.008, 0.02] # need to change learning rate for diff θ
+	αs = [0.02, 0.015, 0.025]
+	# αs = [0.005, 0.008, 0.02] # need to change learning rate for diff θ
 	nruns = 10
 end
 

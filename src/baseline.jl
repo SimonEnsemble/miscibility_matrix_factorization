@@ -72,11 +72,40 @@ function test_perf_baseline_model(
 	)
 end
 
+function miscibility_probabilities(data::MiscibilityData, raw_data::RawData)
+	compound_categories = unique(raw_data.classes)
+
+	π_miscible = Dict{String, Dict{String, Float64}}()
+	for cat_a in compound_categories
+		π_miscible[cat_a] = Dict{String, Float64}()
+		for cat_b in compound_categories
+			n_total = 0 # total # mixtures in this category
+			n_miscible = 0
+			for i = 1:raw_data.n_compounds, j = 1:raw_data.n_compounds
+                if i == j
+                    continue
+                end
+				if (cat_a, cat_b) == (raw_data.classes[i], raw_data.classes[j])
+					if ! ismissing(data.M[i, j])
+						n_total += 1
+						n_miscible += data.M[i, j]
+					end
+				end
+			end
+			π_miscible[cat_a][cat_b] = n_miscible / n_total
+		end
+	end
+	return π_miscible
+end
+
 function test_perf_guessing(data::MiscibilityData, raw_data::RawData)
-    θ_miscible = mean([data.M[i, j] for (i, j) in data.ids_obs])
+    π_miscible = miscibility_probabilities(data, raw_data)
 	
     m = [raw_data.M_complete[i, j] for (i, j) in data.ids_missing]
-    m̂ = [rand() < θ_miscible for (i, j) in data.ids_missing]
+    m̂ = [NaN for i = 1:length(data.ids_missing)]
+    for (k, (i, j)) in enumerate(data.ids_missing)
+        m̂[k] = rand() < π_miscible[raw_data.classes[i]][raw_data.classes[j]]
+    end
 
 	return (f1=f1_score(m, m̂),
 		    accuracy=accuracy_score(m, m̂),
