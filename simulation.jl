@@ -75,8 +75,11 @@ raw_data.n_compounds * (raw_data.n_compounds - 1) / 2 # pairs
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
 viz_miscibility_matrix(raw_data.M_complete, raw_data)
 
-# ╔═╡ dd2ea5be-c2f0-4260-8e3a-0129c9ec1351
-md"### viz graph"
+# ╔═╡ 7dc9e6eb-095d-417d-9cff-534b702159d2
+raw_data.classes
+
+# ╔═╡ 13eeb4b6-3017-4e6e-a872-21afc10ff93c
+viz_category_miscibility(raw_data)
 
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
@@ -324,7 +327,8 @@ end
 # ╠═e6a9d962-21c3-4823-85f4-1dc11a19a251
 # ╠═f602a244-4781-4155-9f8f-af89783bead3
 # ╠═f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
-# ╟─dd2ea5be-c2f0-4260-8e3a-0129c9ec1351
+# ╠═7dc9e6eb-095d-417d-9cff-534b702159d2
+# ╠═13eeb4b6-3017-4e6e-a872-21afc10ff93c
 # ╟─cdf7421a-aed6-47fb-aac7-74136355a0d3
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb

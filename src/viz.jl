@@ -184,3 +184,63 @@ function viz_confusion(cm::Matrix; save_fig::Bool=false)
     end
 	return fig
 end
+
+function viz_category_miscibility(raw_data::RawData)
+	compound_categories = unique(raw_data.classes)
+
+	M_categories = zeros(length(compound_categories), length(compound_categories))
+
+	Ω_all = [(i, j) for i = 1:raw_data.n_compounds for j = i+1:raw_data.n_compounds]
+
+	for c = 1:4
+		for c′ = 1:4
+			function pair_in_category_pair(i, j)
+				this_cat = (raw_data.classes[i], raw_data.classes[j])
+
+				return this_cat == (compound_categories[c], compound_categories[c′]) || this_cat == (compound_categories[c′], compound_categories[c])
+
+				return this
+			end
+			# get pairs belonging to these two categories
+			ids = [(i, j) for (i, j) in Ω_all if
+				pair_in_category_pair(i, j)]
+
+			outcomes = [raw_data.M_complete[i, j] for (i, j) in ids]
+
+			M_categories[c, c′] = mean(outcomes)
+			if c > c′
+				M_categories[c, c′] = NaN
+			end
+		end
+	end
+
+	for c = 1:4
+		M_categories[c, c] = NaN
+	end
+
+	M_categories_plt = reverse(M_categories, dims=1)'
+
+	fig = Figure()
+	ax  = Axis(fig[1, 1],
+        xlabel="category", ylabel="category",
+        xticks=(1:4, compound_categories),
+        aspect=DataAspect(),
+        yticks=(1:4, reverse(compound_categories)),
+        yticklabelrotation=π/2
+    )
+	hm = heatmap!(M_categories_plt,
+		colormap=reverse(ColorSchemes.viridis), colorrange=(0, 1))
+
+	for i = 1:4
+        for j = 1:4
+			if ! isnan(M_categories_plt[i, j])
+	            text!("$(round(M_categories_plt[i, j], digits=2))",
+	                  position=(i, j), align=(:center, :center), color="black",
+	                  fontsize=25
+	            )
+			end
+        end
+    end
+	Colorbar(fig[1, 2], hm, label="fraction miscible")
+	return fig
+end
