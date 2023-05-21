@@ -19,7 +19,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random
+	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf
 	using MiscibilityMF
 end
 
@@ -58,11 +58,19 @@ unique(raw_data.classes)
 # ╔═╡ 6a683231-7767-4383-a4f0-531b0724513f
 raw_data.classes
 
+# ╔═╡ 1ae9210a-102d-4d55-8e32-9ad0950e0e7f
+for c in unique(raw_data.classes)
+	@printf("# %s = %d\n", c, sum(raw_data.classes .== c))
+end
+
 # ╔═╡ c4a26802-2a30-4b8e-b057-2fce989f0aa0
 sum(raw_data.M_complete .== 0) / 2 # number immiscible
 
 # ╔═╡ e6a9d962-21c3-4823-85f4-1dc11a19a251
-sum(raw_data.M_complete .== 1) / 2 - raw_data.n_compounds # number miscible
+(sum(raw_data.M_complete .== 1) - raw_data.n_compounds) / 2 # number miscible (discount diagonal)
+
+# ╔═╡ f602a244-4781-4155-9f8f-af89783bead3
+raw_data.n_compounds * (raw_data.n_compounds - 1) / 2 # pairs
 
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
 viz_miscibility_matrix(raw_data.M_complete, raw_data)
@@ -78,6 +86,30 @@ md"# introduce missing values"
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
 data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
+
+# ╔═╡ 377d754f-c6cb-48c6-8ce4-1fe3335a23a1
+fraction_miscible = mean([data.M[i, j] for (i, j) in data.ids_obs])
+
+# ╔═╡ c44c0475-f5f2-4a6c-9ba0-2d4eb1432c65
+diagonal(raw_data.M_complete)
+
+# ╔═╡ 83fb5b8f-ec45-4c02-b1b0-415cf12c5a32
+sum(raw_data.M_complete .== 1)
+
+# ╔═╡ d543dc27-5036-4f09-8c59-5827c2b9eeb6
+sum(raw_data.M_complete .== 0)
+
+# ╔═╡ 4fe80c59-9ecc-4915-988a-8bfcb4b9b906
+sum([raw_data.M_complete[i, j] for (i, j) in data.ids_obs] .== 0)
+
+# ╔═╡ 75d86f68-459e-4c83-9565-7d93fe242f24
+raw_data.n_compounds^2
+
+# ╔═╡ 32fe178d-b9c3-4e02-ab0a-be00ef6a7114
+sum([data.M[i, j] for (i, j) in data.ids_obs] .== 0)
+
+# ╔═╡ d280af72-5ac9-4da8-ac13-b852a11feedd
+
 
 # ╔═╡ e292d20e-9031-4276-87fb-b59685db2f72
 length(data.ids_obs)
@@ -123,7 +155,7 @@ fig_losses
 md"## train model with opt hyper-params"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.006)
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=0.0065)
 
 # ╔═╡ 2533b992-e881-417e-ba9b-7c3555751340
 losses[end]
@@ -134,7 +166,7 @@ viz_loss(losses)
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 begin
 	set_opt_cutoff!(model, raw_data, data.ids_obs)
-	# model.cutoff = 0.5
+	# was 0.605
 end
 
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
@@ -256,17 +288,17 @@ end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
 if do_multiple_runs
-	viz_hyperparam(:λ, θ_to_perf[0.2])
+	viz_hyperparam(:λ, θ_to_perf[0.8])
 end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
 if do_multiple_runs
-	viz_hyperparam(:γ, θ_to_perf[0.2])
+	viz_hyperparam(:γ, θ_to_perf[0.8])
 end
 
 # ╔═╡ f37c6347-17fe-4166-bcad-3f5951c70dcb
 if do_multiple_runs
-	viz_hyperparam(:k, θ_to_perf[0.2])
+	viz_hyperparam(:k, θ_to_perf[0.8])
 end
 
 # ╔═╡ Cell order:
@@ -279,13 +311,23 @@ end
 # ╠═2090c5f8-cd9c-4bd5-abd5-b5724420c940
 # ╠═417910f2-15e6-4db5-b7f6-b14275ef43c7
 # ╠═6a683231-7767-4383-a4f0-531b0724513f
+# ╠═1ae9210a-102d-4d55-8e32-9ad0950e0e7f
 # ╠═c4a26802-2a30-4b8e-b057-2fce989f0aa0
 # ╠═e6a9d962-21c3-4823-85f4-1dc11a19a251
+# ╠═f602a244-4781-4155-9f8f-af89783bead3
 # ╠═f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
 # ╟─dd2ea5be-c2f0-4260-8e3a-0129c9ec1351
 # ╟─cdf7421a-aed6-47fb-aac7-74136355a0d3
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
+# ╠═377d754f-c6cb-48c6-8ce4-1fe3335a23a1
+# ╠═c44c0475-f5f2-4a6c-9ba0-2d4eb1432c65
+# ╠═83fb5b8f-ec45-4c02-b1b0-415cf12c5a32
+# ╠═d543dc27-5036-4f09-8c59-5827c2b9eeb6
+# ╠═4fe80c59-9ecc-4915-988a-8bfcb4b9b906
+# ╠═75d86f68-459e-4c83-9565-7d93fe242f24
+# ╠═32fe178d-b9c3-4e02-ab0a-be00ef6a7114
+# ╠═d280af72-5ac9-4da8-ac13-b852a11feedd
 # ╠═e292d20e-9031-4276-87fb-b59685db2f72
 # ╠═6991d2b0-73df-4b09-aadf-a5877fa5aa5a
 # ╠═436164ee-01b8-46ad-9e96-5e72368444d4
