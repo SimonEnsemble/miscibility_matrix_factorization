@@ -22,7 +22,7 @@ function run_experiment(data::MiscibilityData,
     hyperparams_cv = gen_hyperparams(nb_hyperparams, graph_regularization)
 
     # conduct hyper-param optimization viz K-folds cross validation on training data
-    perf_metrics, opt_hyperparams, fig_losses = do_hyperparam_optimization(
+    perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(
 		data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α)
 
     # train deployment model on all training data with opt hyper-params

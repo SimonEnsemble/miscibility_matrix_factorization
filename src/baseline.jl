@@ -27,7 +27,7 @@ function build_Xy(data::MiscibilityData, raw_data::RawData)
 	@assert length(data.ids_missing) * 2 == length(y_test)
 	@assert length(X_train) == length(y_train)
 	@assert length(X_test) == length(y_test)
-	@assert length(X_train[1]) == 7*2 # number of features
+    @assert length(X_train[1]) == (7+raw_data.n_compounds)*2 # number of features
 	return X_train, y_train, X_test, y_test
 end
 

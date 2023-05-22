@@ -47,7 +47,10 @@ TableOfContents()
 md"# read in raw data"
 
 # ╔═╡ 11ed0c10-24d7-4c4e-a9f3-4625d96ee7ff
-const raw_data = retreive_raw_data()
+const raw_data = retreive_raw_data(normalize_features=false)
+
+# ╔═╡ 298bc445-01cf-4c25-8494-5259f4fa6684
+raw_data.classes
 
 # ╔═╡ 2090c5f8-cd9c-4bd5-abd5-b5724420c940
 raw_data.X
@@ -300,7 +303,7 @@ end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
 if do_multiple_runs
-	viz_hyperparam(:λ, θ_to_perf[0.8])
+	viz_hyperparam(:λ, θ_to_perf[0.2])
 end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
@@ -320,6 +323,7 @@ end
 # ╠═78ea2361-f2b7-4e0b-ad73-f4ddffecdff7
 # ╟─59986921-6e8c-4d38-ae3c-7e7ba1bc246d
 # ╠═11ed0c10-24d7-4c4e-a9f3-4625d96ee7ff
+# ╠═298bc445-01cf-4c25-8494-5259f4fa6684
 # ╠═2090c5f8-cd9c-4bd5-abd5-b5724420c940
 # ╠═417910f2-15e6-4db5-b7f6-b14275ef43c7
 # ╠═6a683231-7767-4383-a4f0-531b0724513f
