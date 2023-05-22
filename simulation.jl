@@ -88,7 +88,7 @@ viz_category_miscibility(raw_data)
 md"# introduce missing values"
 
 # ╔═╡ 6a1a696c-88e5-46b3-abcc-376ec8099d90
-θ = 0.8 # fraction missing
+θ = 0.5 # fraction missing
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
 data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
@@ -121,7 +121,7 @@ set learning rate and number of epochs for gradient descent.
 
 # ╔═╡ abbb1485-8652-4cc5-b749-ab93db6b64fc
 begin
-	α = 0.025
+	α = 0.016
 	nb_epochs = 350
 end
 
@@ -140,7 +140,7 @@ end
 perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, record_loss=true)
 
 # ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
-perf_metrics[:, opt_hps_id] # best cross-validation perf
+mean(perf_metrics[:, opt_hps_id]) # best cross-validation perf
 
 # ╔═╡ 09165856-9117-47e4-8560-fc3f457ad6df
 fig_losses
@@ -155,9 +155,7 @@ model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs
 viz_loss(losses, save_fig=true)
 
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
-begin
-	set_opt_cutoff!(model, raw_data, data.ids_obs)
-end
+set_opt_cutoff!(model, raw_data, data.ids_obs)
 
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
 viz_latent_space(model, raw_data)
@@ -221,7 +219,7 @@ md"# multiple runs and sparsities"
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
 begin
 	θs = [0.2, 0.5, 0.8]
-	αs = [0.02, 0.015, 0.025]
+	αs = [0.02, 0.016, 0.025]
 	# αs = [0.005, 0.008, 0.02] # need to change learning rate for diff θ
 	nruns = 10
 end
