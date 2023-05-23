@@ -76,13 +76,31 @@ sum(raw_data.M_complete .== 0) / 2 # number immiscible
 raw_data.n_compounds * (raw_data.n_compounds - 1) / 2 # pairs
 
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
-viz_miscibility_matrix(raw_data.M_complete, raw_data)
+viz_miscibility_matrix(raw_data.M_complete, raw_data, draw_brackets=true)
 
 # ╔═╡ 7dc9e6eb-095d-417d-9cff-534b702159d2
 raw_data.classes
 
 # ╔═╡ 13eeb4b6-3017-4e6e-a872-21afc10ff93c
 viz_category_miscibility(raw_data)
+
+# ╔═╡ 4c7abede-63b3-4ae9-a14c-f371ee5c460a
+md"some manual checks with the paper"
+
+# ╔═╡ 49229699-6b42-4fa7-ad75-6ebdd0852eaf
+id_chit = findfirst(raw_data.compounds .== "Chit")
+
+# ╔═╡ a5ad1ba4-c3d6-4694-94c7-daf11ee8fd79
+@assert raw_data.X[raw_data.features .== "XlogP3", id_chit][1] ≈ -2.7
+
+# ╔═╡ 9562eb0c-5c08-4be3-b578-720c0f74bee1
+@assert raw_data.X[raw_data.features .== "is_Polymer", id_chit][1] ≈ 1.0
+
+# ╔═╡ 04fb2587-6566-4221-b403-8b2e6d25811d
+@assert raw_data.classes[id_chit] == "Polymer"
+
+# ╔═╡ 1d7a5810-a610-469a-9653-d52d1c697431
+
 
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
@@ -332,6 +350,12 @@ end
 # ╠═f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
 # ╠═7dc9e6eb-095d-417d-9cff-534b702159d2
 # ╠═13eeb4b6-3017-4e6e-a872-21afc10ff93c
+# ╟─4c7abede-63b3-4ae9-a14c-f371ee5c460a
+# ╠═49229699-6b42-4fa7-ad75-6ebdd0852eaf
+# ╠═a5ad1ba4-c3d6-4694-94c7-daf11ee8fd79
+# ╠═9562eb0c-5c08-4be3-b578-720c0f74bee1
+# ╠═04fb2587-6566-4221-b403-8b2e6d25811d
+# ╠═1d7a5810-a610-469a-9653-d52d1c697431
 # ╟─cdf7421a-aed6-47fb-aac7-74136355a0d3
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb

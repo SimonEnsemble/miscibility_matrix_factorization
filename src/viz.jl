@@ -89,7 +89,11 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
         notify(t_ax.finallimits)
         notify(r_ax.finallimits)
     end
-    save("miscibility_matrix.pdf", fig)
+    if any(ismissing.(M))
+        save("miscibility_matrix.pdf", fig)
+    else
+        save("miscibility_matrix_complete.pdf", fig)
+    end
 	return fig
 end
 
@@ -191,31 +195,25 @@ function viz_category_miscibility(raw_data::RawData)
 	M_categories = zeros(length(compound_categories), length(compound_categories))
 
 	Ω_all = [(i, j) for i = 1:raw_data.n_compounds for j = i+1:raw_data.n_compounds]
+    @assert length(Ω_all) == Int(raw_data.n_compounds*(raw_data.n_compounds-1)/2)
 
 	for c = 1:4
 		for c′ = 1:4
 			function pair_in_category_pair(i, j)
 				this_cat = (raw_data.classes[i], raw_data.classes[j])
 
-				return this_cat == (compound_categories[c], compound_categories[c′]) || this_cat == (compound_categories[c′], compound_categories[c])
-
-				return this
+                return ((this_cat == (compound_categories[c], compound_categories[c′])) || (this_cat == (compound_categories[c′], compound_categories[c])))
 			end
 			# get pairs belonging to these two categories
-			ids = [(i, j) for (i, j) in Ω_all if
-				pair_in_category_pair(i, j)]
+			ids = [(i, j) for (i, j) in Ω_all if pair_in_category_pair(i, j)]
 
 			outcomes = [raw_data.M_complete[i, j] for (i, j) in ids]
 
-			M_categories[c, c′] = mean(outcomes)
+			M_categories[c, c′] = 1.0 - mean(outcomes)
 			if c > c′
 				M_categories[c, c′] = NaN
 			end
 		end
-	end
-
-	for c = 1:4
-		M_categories[c, c] = NaN
 	end
 
 	M_categories_plt = reverse(M_categories, dims=1)'
@@ -229,7 +227,7 @@ function viz_category_miscibility(raw_data::RawData)
         yticklabelrotation=π/2
     )
 	hm = heatmap!(M_categories_plt,
-		colormap=ColorSchemes.viridis, colorrange=(0, 1))
+                  colormap=reverse(ColorSchemes.viridis), colorrange=(0, 1))
 
 	for i = 1:4
         for j = 1:4
@@ -241,7 +239,7 @@ function viz_category_miscibility(raw_data::RawData)
 			end
         end
     end
-	Colorbar(fig[1, 2], hm, label="fraction miscible")
+	Colorbar(fig[1, 2], hm, label="fraction ATPS forming")
     save("category_based_miscibility.pdf", fig)
 	return fig
 end
