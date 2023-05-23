@@ -90,6 +90,9 @@ md"some manual checks with the paper"
 # ╔═╡ 49229699-6b42-4fa7-ad75-6ebdd0852eaf
 id_chit = findfirst(raw_data.compounds .== "Chit")
 
+# ╔═╡ 6d3eb9ac-0f2d-4ae2-bc0f-42b5a4beec82
+@assert sum(raw_data.M_complete[id_chit, :] .== 0) == 22
+
 # ╔═╡ a5ad1ba4-c3d6-4694-94c7-daf11ee8fd79
 @assert raw_data.X[raw_data.features .== "XlogP3", id_chit][1] ≈ -2.7
 
@@ -101,6 +104,9 @@ id_chit = findfirst(raw_data.compounds .== "Chit")
 
 # ╔═╡ 1d7a5810-a610-469a-9653-d52d1c697431
 id_cas = findfirst(raw_data.compounds .== "Cas")
+
+# ╔═╡ 80984df5-aa7a-4e4d-b0e3-40d5721d400e
+@assert sum(raw_data.M_complete[id_cas, :] .== 0) == 19
 
 # ╔═╡ e4d68be8-0adc-4023-bfd2-ff358230d159
 @assert raw_data.M_complete[id_chit, id_cas] == 0
@@ -367,10 +373,12 @@ end
 # ╠═13eeb4b6-3017-4e6e-a872-21afc10ff93c
 # ╟─4c7abede-63b3-4ae9-a14c-f371ee5c460a
 # ╠═49229699-6b42-4fa7-ad75-6ebdd0852eaf
+# ╠═6d3eb9ac-0f2d-4ae2-bc0f-42b5a4beec82
 # ╠═a5ad1ba4-c3d6-4694-94c7-daf11ee8fd79
 # ╠═9562eb0c-5c08-4be3-b578-720c0f74bee1
 # ╠═04fb2587-6566-4221-b403-8b2e6d25811d
 # ╠═1d7a5810-a610-469a-9653-d52d1c697431
+# ╠═80984df5-aa7a-4e4d-b0e3-40d5721d400e
 # ╠═e4d68be8-0adc-4023-bfd2-ff358230d159
 # ╠═6a6b0516-649d-43a1-8635-97c2cc463009
 # ╠═53daf2c2-6df5-472d-b0db-84c0958a2046
