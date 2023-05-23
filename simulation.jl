@@ -100,7 +100,22 @@ id_chit = findfirst(raw_data.compounds .== "Chit")
 @assert raw_data.classes[id_chit] == "Polymer"
 
 # ╔═╡ 1d7a5810-a610-469a-9653-d52d1c697431
+id_cas = findfirst(raw_data.compounds .== "Cas")
 
+# ╔═╡ e4d68be8-0adc-4023-bfd2-ff358230d159
+@assert raw_data.M_complete[id_chit, id_cas] == 0
+
+# ╔═╡ 6a6b0516-649d-43a1-8635-97c2cc463009
+id_chol = findfirst(raw_data.compounds .== "Chol")
+
+# ╔═╡ 53daf2c2-6df5-472d-b0db-84c0958a2046
+@assert raw_data.M_complete[id_chit, id_chol] == 0
+
+# ╔═╡ 2675e9aa-a1c6-4982-a83f-a9ff5e3368b5
+id_ppg = findfirst(raw_data.compounds .== "PPG")
+
+# ╔═╡ 8874b2df-b17b-43bd-b16a-9dc18e4ad0e1
+@assert raw_data.M_complete[id_chit, id_ppg] == 1
 
 # ╔═╡ cdf7421a-aed6-47fb-aac7-74136355a0d3
 md"# introduce missing values"
@@ -356,6 +371,11 @@ end
 # ╠═9562eb0c-5c08-4be3-b578-720c0f74bee1
 # ╠═04fb2587-6566-4221-b403-8b2e6d25811d
 # ╠═1d7a5810-a610-469a-9653-d52d1c697431
+# ╠═e4d68be8-0adc-4023-bfd2-ff358230d159
+# ╠═6a6b0516-649d-43a1-8635-97c2cc463009
+# ╠═53daf2c2-6df5-472d-b0db-84c0958a2046
+# ╠═2675e9aa-a1c6-4982-a83f-a9ff5e3368b5
+# ╠═8874b2df-b17b-43bd-b16a-9dc18e4ad0e1
 # ╟─cdf7421a-aed6-47fb-aac7-74136355a0d3
 # ╠═6a1a696c-88e5-46b3-abcc-376ec8099d90
 # ╠═3c44a682-8161-4b03-aaf0-4d9b813c99cb
