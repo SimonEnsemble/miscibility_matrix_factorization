@@ -106,43 +106,49 @@ end
 
 # α: learning rate
 function grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}; α::Float64=0.01)
-
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
 		model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
 	end
 
 	# update bias
-		model.b -= α * ∇_b(data, model)
+    model.b -= α * ∇_b(data, model)
 	return nothing
 end
 
+mutable struct AdamOptInfo
+    α::Float64 # learning rate
+    β::Tuple{Float64, Float64}
+    ϵ::Float64
+    # moments and biases for compound vectors
+    m_C::Vector{Float64}
+    v_C::Vector{Float64}
+    # moments and biases for bias 
+    m_b::Float64
+    v_b::Float64
+end
 
-# α: learning rate
-function adam_grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}; α::Float64=0.01)
+# see https://arxiv.org/pdf/1412.6980.pdf
+function adam_grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}, t::Int, adam_info::AdamOptInfo)
+	# update compound vectors
+	for c = shuffle(1:data.n_compounds)
+		the_∇_cᵢ = ∇_cᵢ(data, model, c, K)
+		adam_info.m_C[:, c] = adam_info.β[1] * adam_info.m_C[:, c] + (1 - adam_info.β[2]) * the_∇_cᵢ
+		vw = beta2.*vw + (1-beta2).*cgrad.*cgrad
+		mhat = mw./(1-beta1^t)
+		vhat = vw./(1-beta2^t)
+        * ∇_cᵢ(data, model, c, K)
+		model.C[:, c] -= α*mhat./(sqrt.(vhat) + epsilon)
+		model.C[:, c] -= adam_info.α * m̂ / (sqrt.(v̂) + adam_info.ϵ) 
+	end
 
-	# Adam algorithm params
-	beta1 = 0.9
-    beta2 = 0.999
-    epsilon = 1e-8
-
-	mw = zeros(size(model.C)[1]) # first moment of gradient wrt c
-    vw = zeros(size(model.C)[1]) # second moment of gradient wrt c
-    mb = zeros(size(model.b)[1]) # first moment of gradient wrt b
-    vb = zeros(size(model.b)[1])  # second moment of gradient wrt b
-	cgrad = ∇_cᵢ(data, model, c, K)
-	bgrad = ∇_b(data, model)
-	t = nb_epochs
-
+	# update bias
+    model.b -= α * ∇_b(data, model)
+	return nothing
 
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
 
-		mw = beta1.*mw + (1-beta1).*cgrad
-		vw = beta2.*vw + (1-beta2).*cgrad.*cgrad
-		mhat = mw./(1-beta1^t)
-		vhat = vw./(1-beta2^t)
-		model.C[:, c] -= α*mhat./(sqrt.(vhat) + epsilon)
 
 		#model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
 	end
@@ -167,7 +173,9 @@ function construct_train_model(hyperparams::NamedTuple,
 	                           nb_epochs::Int;
 							   α::Float64=0.006, # learning rate
 							   cutoff::Float64=0.5,
-                               record_loss::Bool=false)
+                               record_loss::Bool=false,
+                               use_adam::Bool=false
+                               )
 	# initialize model
 	f_miscible = fraction_miscible(data.M)
 	b_guess = log(f_miscible / (1 - f_miscible))
@@ -186,8 +194,17 @@ function construct_train_model(hyperparams::NamedTuple,
 
 	# gradient descent epochs. keep track of loss.
 	losses = [NaN for _ = 1:nb_epochs]
-	for s = 1:nb_epochs
-		grad_descent_epoch!(data, model, K, α=α * θ̃) # scale learning rate
+    if use_adam
+        adam_info = AdamOptInfo(α, (0.9, 0.99), 1e-8, 
+                                zeros(size(model.C)), zeros(size(model.C)),
+                                0.0, 0.0)
+    end
+	for t = 1:nb_epochs
+        if use_adam
+            adam_grad_descent_epoch!(data, model, K, t, adam_info)
+        else
+            grad_descent_epoch!(data, model, K, α=α * θ̃) # scale learning rate
+        end
         if record_loss
             losses[s] = loss(data, model, K)
         end
