@@ -106,12 +106,54 @@ end
 
 # α: learning rate
 function grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}; α::Float64=0.01)
+
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
 		model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
 	end
+
 	# update bias
-	model.b -= α * ∇_b(data, model)
+		model.b -= α * ∇_b(data, model)
+	return nothing
+end
+
+
+# α: learning rate
+function adam_grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}; α::Float64=0.01)
+
+	# Adam algorithm params
+	beta1 = 0.9
+    beta2 = 0.999
+    epsilon = 1e-8
+
+	mw = zeros(size(model.C)[1]) # first moment of gradient wrt c
+    vw = zeros(size(model.C)[1]) # second moment of gradient wrt c
+    mb = zeros(size(model.b)[1]) # first moment of gradient wrt b
+    vb = zeros(size(model.b)[1])  # second moment of gradient wrt b
+	cgrad = ∇_cᵢ(data, model, c, K)
+	bgrad = ∇_b(data, model)
+	t = nb_epochs
+
+
+	# update compound vectors
+	for c = shuffle(1:data.n_compounds)
+
+		mw = beta1.*mw + (1-beta1).*cgrad
+		vw = beta2.*vw + (1-beta2).*cgrad.*cgrad
+		mhat = mw./(1-beta1^t)
+		vhat = vw./(1-beta2^t)
+		model.C[:, c] -= α*mhat./(sqrt.(vhat) + epsilon)
+
+		#model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
+	end
+
+	# update bias
+	mb = beta1.*mb + (1-beta1).*bgrad
+	vb = beta2.*vb + (1-beta2).*bgrad.*bgrad
+	mhat = mb./(1-beta1^t)
+	vhat = vb./(1-beta2^t)
+	model.b -= α*mhat./(np.sqrt(vhat) + epsilon)
+	#model.b -= α * ∇_b(data, model)
 	return nothing
 end
 
