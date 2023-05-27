@@ -6,7 +6,8 @@ function do_hyperparam_optimization(
 	nb_epochs::Int=250,
 	type_of_perf_metric::Symbol=:balanced_accuracy,
     record_loss::Bool=false,
-    α::Float64=0.006
+    α::Float64=0.006,
+    use_adam::Bool=false
 )
 	# cross-validation split
 	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
@@ -42,7 +43,7 @@ function do_hyperparam_optimization(
 		# loop thru hyperparams
 		for (n, hps) in enumerate(hyperparams)
 			# train model
-			cv_model, cv_losses = construct_train_model(hps, cv_data, raw_data, nb_epochs, α=α, record_loss=record_loss)
+			cv_model, cv_losses = construct_train_model(hps, cv_data, raw_data, nb_epochs, α=α, record_loss=record_loss, use_adam=use_adam)
             if record_loss
                 _viz_loss!(axs[i_fold, n], cv_losses)
             end
