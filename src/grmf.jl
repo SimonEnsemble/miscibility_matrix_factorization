@@ -132,34 +132,26 @@ end
 function adam_grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matrix{Float64}, t::Int, adam_info::AdamOptInfo)
 	# update compound vectors
 	for c = shuffle(1:data.n_compounds)
+        # compute graident
 		the_∇_cᵢ = ∇_cᵢ(data, model, c, K)
-		adam_info.m_C[:, c] = adam_info.β[1] * adam_info.m_C[:, c] + (1 - adam_info.β[2]) * the_∇_cᵢ
-		vw = beta2.*vw + (1-beta2).*cgrad.*cgrad
-		mhat = mw./(1-beta1^t)
-		vhat = vw./(1-beta2^t)
-        * ∇_cᵢ(data, model, c, K)
-		model.C[:, c] -= α*mhat./(sqrt.(vhat) + epsilon)
-		model.C[:, c] -= adam_info.α * m̂ / (sqrt.(v̂) + adam_info.ϵ) 
+        # update first moment
+		adam_info.m_C[:, c] = adam_info.β[1] * adam_info.m_C[:, c] + (1 - adam_info.β[1]) * the_∇_cᵢ
+        # update second moment
+		adam_info.v_C[:, c] = adam_info.β[2] * adam_info.v_C[:, c] + (1 - adam_info.β[2]) * the_∇_cᵢ.^ 2
+        # bias corrected first moment estimate
+        m̂_C = adam_info.m_C[:, c] / (1 - adam_info.β[1] ^ t)
+        v̂_C = adam_info.v_C[:, c] / (1 - adam_info.β[2] ^ t)
+        # finall, update
+		model.C[:, c] -= adam_info.α * m̂_C ./ (sqrt.(v̂_C) .+ adam_info.epsilon)
 	end
 
 	# update bias
-    model.b -= α * ∇_b(data, model)
-	return nothing
-
-	# update compound vectors
-	for c = shuffle(1:data.n_compounds)
-
-
-		#model.C[:, c] -= α * ∇_cᵢ(data, model, c, K)
-	end
-
-	# update bias
-	mb = beta1.*mb + (1-beta1).*bgrad
-	vb = beta2.*vb + (1-beta2).*bgrad.*bgrad
-	mhat = mb./(1-beta1^t)
-	vhat = vb./(1-beta2^t)
-	model.b -= α*mhat./(np.sqrt(vhat) + epsilon)
-	#model.b -= α * ∇_b(data, model)
+    the_∇_b = ∇_b(data, model)
+    adam_info.m_b = adam_info.β[1] * adam_info.m_b + (1 - adam_info.β[1]) * the_∇_b
+    adam_info.v_b[:, c] = adam_info.β[2] * adam_info.v_b + (1 - adam_info.β[2]) * the_∇_b ^ 2
+    m̂_b = adam_info.m_b / (1 - adam_info.β[1] ^ t)
+    v̂_b = adam_info.v_b / (1 - adam_info.β[2] ^ t)
+    model.b -= adam_info.α * m̂_b / (sqrt(v̂_b) .+ adam_info.epsilon)
 	return nothing
 end
 
@@ -206,7 +198,7 @@ function construct_train_model(hyperparams::NamedTuple,
             grad_descent_epoch!(data, model, K, α=α * θ̃) # scale learning rate
         end
         if record_loss
-            losses[s] = loss(data, model, K)
+            losses[t] = loss(data, model, K)
         end
 	end
 	return model, losses
