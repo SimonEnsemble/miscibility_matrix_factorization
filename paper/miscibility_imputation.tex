@@ -1,0 +1,157 @@
+\documentclass[11pt, oneside]{article}  
+\usepackage{geometry}  
+% \usepackage{nunito}
+\usepackage{cmbright}
+\geometry{letterpaper}   
+\usepackage{cite}
+\usepackage{graphicx}				% Use pdf, png, jpg, or eps§ with pdflatex; use eps in DVI mode
+								% TeX will automatically convert eps --> pdf in pdflatex	
+\usepackage{tcolorbox}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{color}
+\definecolor{c1}{rgb}{0.12, 0.56, 1.0}
+%SetFonts
+\usepackage{xspace}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{authblk} 
+
+\definecolor{fruitpushorange}{RGB}{255, 127, 0}
+
+\usepackage{soul}
+\DeclareRobustCommand{\cms}[1]{ {\begingroup\sethlcolor{fruitpushorange}\hl{(cms:) #1}\endgroup} }
+%SetFonts
+
+
+\title{Data-driven imputation of compound miscibility via matrix factorization with graph regularization}
+\author[1]{Diba Behnoudfar}
+\author[1,$\dagger$]{Cory M. Simon}
+\author[2,*]{Joshua Schrier}
+\affil[1]{School of Chemical, Biological, and Environmental Engineering. Oregon State University. Corvallis, OR. USA. }
+\affil[2]{Department of Chemistry, Fordham University, The Bronx, New York 10458, USA}
+\affil[$\dagger$]{\texttt{cory.simon@oregonstate.edu}} 
+\affil[*]{\texttt{jschrier@fordham.edu}}
+
+%\affil[*]{}
+\date{}							% Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+
+\end{abstract}
+
+\section{Introduction}
+
+\cite{shu2022robust}
+
+\section{Problem setup: imputing compound miscibility, leveraging compound features}
+
+\section{Graph-regularized matrix factorization for imputing compound miscibility}
+
+\subsection{The data}
+data: $\{ m_{ij} \}_{(i, j) \in \Omega_{\text{obs}}}$ where $m_{ij}\in\{0, 1\}$ is the miscibility of compound $i$ and $j$ (0: immiscible, 1: miscible).
+The set $\Omega_\text{obs} \subset \{1,..n\} \times \{1, ..., n\}$ is the set of observed tuples.
+
+\subsection{The miscibility model}
+$c_i \in \mathbb{R}^k$: latent vector representation of compound $i$.
+
+model
+\begin{equation}
+	m_{ij} \approx \sigma(c_i \cdot c_j + b)
+\end{equation}
+
+\subsection{Training}
+
+loss:
+
+\begin{multline}
+	\ell(C, b) = - \displaystyle \sum_{(i, j) \in \Omega_{\text{obs}}} \left[ m_{ij} \log \left(\sigma(c_i \cdot c_j+b)\right) + (1-m_{ij}) \log \left(1-\sigma(c_i \cdot c_j+b)\right)  \right] \\
+	+ \lambda \displaystyle\sum_{i=1}^n \lvert \lvert c_i \rvert \rvert^2 + \gamma  \displaystyle \sum_{(i, j)} k(i, j) \lvert \lvert c_i - c_j \rvert \rvert^2
+\end{multline}
+
+gradients
+
+\begin{equation*}
+     \nabla_{\vec{c_i}}\ell = -\sum_{(i,j) \in \Omega} \vec{c_j} (\hat{m}_{ij} -m_{ij}) \times wt_{ij} +  2\gamma \sum_{(i,j)} K(i,j)( \vec{c_i} - \vec{c_j}) + 2\lambda \sum_{i} \vec{c_i} \\
+\end{equation*}
+
+\begin{equation*}
+     \nabla_b\ell = -\sum_{(i,j) \in \Omega}  (\hat{m}_{ij} -m_{ij}) \times wt_{ij}  \\
+\end{equation*}
+
+
+\subsection{Hyperparameter tuning}
+parameters: 
+\begin{itemize}	
+	\item latent compound vectors, $C$
+	\item bias, $b$
+\end{itemize}
+hyperparameters:
+\begin{itemize}	
+	\item dimension of latent space, $k$ 
+	\item compound vector regularization param, $\lambda$
+	\item graph-regularization param, $\gamma$
+	\item (if features) the bandwidth of the kernel parameter
+\end{itemize}
+
+
+\section{Results}
+
+\subsection{Simulating incomplete experiments to generate incomplete miscibility matrix}
+
+\subsection{A typical outcome}
+\subsubsection{The pairwise compound miscibility matrix}
+
+\subsubsection{Training and hyper-parameter tuning}
+
+\subsubsection{The latent space of compounds}
+\subsubsection{Miscibility imputation performance}
+
+\subsubsection{Comparisons: with, without graph regularization}
+  \begin{itemize}
+   \item vanilla matrix factorization ($\gamma=0$) vs.\ graph-regularized matrix factorization $\gamma > 0$.
+   \item class-only $k(i,j)$ vs.\ feature-vector-based $k(i, j)$. okay both are features. just combine?
+  \end{itemize}
+
+
+\subsection{Ensemble of performances, over different sparsities}
+
+\subsection{Baseline models}
+
+not comparable to paper b/c theirs is complete.
+
+train RF on obs data. predict on unobs data.
+
+idea 1: train one RF per compound. 
+
+idea 2: train RF, input = concat two compound features, then data augmentation to impose permutation invariance. need to do class weights to handle their resampling. 
+
+random baseline (guessing), with proportion in training data.
+
+\section{convo with Joshua, Dec 19}
+kernels that can handle missing data?
+
+scan hyperparams: (a) keep $\lambda$, $k$ set same, randomly selected or (b) scan grid.
+
+if we generate enuff numbers, then ok...
+
+p-value/hypothesis test. for random choice of hyper-params. which model does better?
+
+Joshua likes class-only. then don't need to find the features and do imputation. 
+
+
+
+
+uncertainty quantification via bootstrap?
+
+\bibliography{refs}
+\bibliographystyle{unsrt}
+
+\end{document}  
