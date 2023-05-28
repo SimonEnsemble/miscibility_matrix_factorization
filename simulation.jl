@@ -289,14 +289,15 @@ end
 
 # ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 function balanced_acc_boxplot(θs, θ_to_perf)
-	models = ["GR-MF", "MF", "RF", "guess"]
+	models = ["GR-LMF", "LMF", "RF", "guess"]
 	model_to_dodge = Dict(zip(models, 1:length(models)))
 	model_to_color = Dict(zip(models, ColorSchemes.Accent_4))
 
 	# panel for each θ.
-	fig = Figure(resolution=(700, 400))
+	fig = Figure(resolution=(600, 400))
 	axs = [Axis(fig[1, i], 
-				xlabel=i == 2 ? "model" : "", 
+				xlabel=i == 2 ? "model" : "",
+				xticklabelrotation=π/2,
 				ylabel=i == 1 ? "balanced accuracy" : "",
 				xticks=(1:length(models), models),
 				title="θ = $(θs[i])"
