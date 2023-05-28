@@ -17,17 +17,18 @@ function run_experiment(data::MiscibilityData,
     nb_hyperparams = mf_settings.nb_hyperparams
     nb_epochs = mf_settings.nb_epochs
     α = mf_settings.α
+    use_adam = mf_settings.use_adam
 
     # create list of hyperparams to explore.
     hyperparams_cv = gen_hyperparams(nb_hyperparams, graph_regularization)
 
     # conduct hyper-param optimization viz K-folds cross validation on training data
     perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(
-		data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α)
+		data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, use_adam=use_adam)
 
     # train deployment model on all training data with opt hyper-params
 	model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, α=α,
-		record_loss=false)
+		record_loss=false, use_adam=use_adam)
 
     set_opt_cutoff!(model, raw_data, data.ids_obs)
 
@@ -44,9 +45,6 @@ end
 function run_experiments(θ::Float64, raw_data::RawData, nruns::Int, mf_settings::NamedTuple)
 	perf_data = DataFrame()
 	all_metrics = [:f1, :accuracy, :precision, :recall, :balanced_accuracy]
-    nb_hyperparams = mf_settings.nb_hyperparams
-    nb_epochs = mf_settings.nb_epochs
-    α = mf_settings.α
 
 	for r = 1:nruns
 		println("run #$r/$nruns")
@@ -60,7 +58,7 @@ function run_experiments(θ::Float64, raw_data::RawData, nruns::Int, mf_settings
 		res = run_experiment(data, raw_data, graph_regularization, mf_settings)
 		for met in all_metrics # this way for Gadfly to work
 			push!(perf_data, (run=r,
-                              model="GR-MF",
+                              model="GR-LMF",
 							  # this metric
 				 			  score=res.perf_metrics.test[met],
 						      metric=String(met),
@@ -77,7 +75,7 @@ function run_experiments(θ::Float64, raw_data::RawData, nruns::Int, mf_settings
 		res = run_experiment(data, raw_data, graph_regularization, mf_settings)
 		for met in all_metrics # this way for Gadfly to work
 			push!(perf_data, (run=r,
-                              model="MF",
+                              model="LMF",
 							  # this metric
 				 			  score=res.perf_metrics.test[met],
 						      metric=String(met),

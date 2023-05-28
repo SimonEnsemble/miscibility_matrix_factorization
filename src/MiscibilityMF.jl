@@ -25,7 +25,7 @@ include.(
 export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData, # data_prep.jl
        sim_data_collection, MiscibilityData, # introduce_missing_entries.jl
        class_similarity_matrix, kernel_matrix, # kernel_matrix.jl
-       construct_train_model, MFModel, # grmf.jl
+       construct_train_model, MFModel, AdamOptInfo, # grmf.jl
        compute_perf_metrics, # perf.jl
        do_hyperparam_optimization, # hyperparam_opt.jl
        set_opt_cutoff!, # set_cutoff.jl

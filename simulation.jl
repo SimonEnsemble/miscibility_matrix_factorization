@@ -127,7 +127,7 @@ id_ppg = findfirst(raw_data.compounds .== "PPG")
 md"# introduce missing values"
 
 # ╔═╡ 6a1a696c-88e5-46b3-abcc-376ec8099d90
-θ = 0.5 # fraction missing
+θ = 0.4 # fraction missing
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
 data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
@@ -262,16 +262,14 @@ md"# multiple runs and sparsities"
 # ╔═╡ e8221855-745c-4eb1-8320-d785b89c284f
 begin
 	θs = [0.2, 0.5, 0.8]
-	αs = [0.02, 0.016, 0.025]
-	# αs = [0.005, 0.008, 0.02] # need to change learning rate for diff θ
 	nruns = 10
 end
 
 # ╔═╡ ea48a8dd-d504-4025-bab4-b2f57e1fd256
 if do_multiple_runs
 	θ_to_perf = Dict()
-	@showprogress for (θ, α) in zip(θs, αs)
-		mf_settings = (; α=α, nb_hyperparams=nb_hyperparams, nb_epochs=nb_epochs)
+	for θ in θs
+		mf_settings = (; α=α, nb_hyperparams=nb_hyperparams, nb_epochs=nb_epochs, use_adam=true)
 		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns, mf_settings)
 	end
 end
