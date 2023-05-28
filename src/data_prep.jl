@@ -18,12 +18,12 @@ function build_miscibility_matrix()
     
     # checks
     @assert M_complete' == M_complete   # symmetric
-	@assert all(diag(M_complete) .== 1) # diagonal all ones
-	# miscible entries
-	@assert M_complete[2, 1] == M_complete[4, 1] == M_complete[13, 3] == 1
-	# immiscible entries
-	@assert M_complete[4, 3] == M_complete[13, 4] == M_complete[12, 3] == M_complete[15, 1] == 0
-	@assert all(diag(M_complete) .== 1) # all compounds miscible with themselves.
+    @assert all(diag(M_complete) .== 1) # diagonal all ones
+    # miscible entries
+    @assert M_complete[2, 1] == M_complete[4, 1] == M_complete[13, 3] == 1
+    # immiscible entries
+    @assert M_complete[4, 3] == M_complete[13, 4] == M_complete[12, 3] == M_complete[15, 1] == 0
+    @assert all(diag(M_complete) .== 1) # all compounds miscible with themselves.
     
     return M_complete, n_compounds
 end
@@ -39,9 +39,9 @@ function build_compound_info(; normalize_features::Bool=true)
 
     # compound features
     _feature_names = ["monomer_mw", "XlogP3", "h-bond_donors",
-					 "h-bond_acceptors", "complexity", "concentration",
-					 "polymer_mw"]
-	_feature_matrix = Matrix(compounds[:, _feature_names])
+                     "h-bond_acceptors", "complexity", "concentration",
+                     "polymer_mw"]
+    _feature_matrix = Matrix(compounds[:, _feature_names])
     # concatenate one-hot encodings of category of compound
     categories = ["Polymer", "Protein", "Salt", "Surfactant"]
     cat_to_id = Dict(zip(categories, 1:4))
