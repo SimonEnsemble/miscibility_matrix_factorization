@@ -121,8 +121,8 @@ mutable struct AdamOptInfo
     β::Tuple{Float64, Float64}
     ϵ::Float64
     # moments and biases for compound vectors
-    m_C::Vector{Float64}
-    v_C::Vector{Float64}
+    m_C::Matrix{Float64}
+    v_C::Matrix{Float64}
     # moments and biases for bias 
     m_b::Float64
     v_b::Float64
@@ -137,21 +137,21 @@ function adam_grad_descent_epoch!(data::MiscibilityData, model::MFModel, K::Matr
         # update first moment
 		adam_info.m_C[:, c] = adam_info.β[1] * adam_info.m_C[:, c] + (1 - adam_info.β[1]) * the_∇_cᵢ
         # update second moment
-		adam_info.v_C[:, c] = adam_info.β[2] * adam_info.v_C[:, c] + (1 - adam_info.β[2]) * the_∇_cᵢ.^ 2
+		adam_info.v_C[:, c] = adam_info.β[2] * adam_info.v_C[:, c] + (1 - adam_info.β[2]) * the_∇_cᵢ .^ 2
         # bias corrected first moment estimate
         m̂_C = adam_info.m_C[:, c] / (1 - adam_info.β[1] ^ t)
         v̂_C = adam_info.v_C[:, c] / (1 - adam_info.β[2] ^ t)
         # finall, update
-		model.C[:, c] -= adam_info.α * m̂_C ./ (sqrt.(v̂_C) .+ adam_info.epsilon)
+		model.C[:, c] -= adam_info.α * m̂_C ./ (sqrt.(v̂_C) .+ adam_info.ϵ)
 	end
 
 	# update bias
     the_∇_b = ∇_b(data, model)
     adam_info.m_b = adam_info.β[1] * adam_info.m_b + (1 - adam_info.β[1]) * the_∇_b
-    adam_info.v_b[:, c] = adam_info.β[2] * adam_info.v_b + (1 - adam_info.β[2]) * the_∇_b ^ 2
+    adam_info.v_b = adam_info.β[2] * adam_info.v_b + (1 - adam_info.β[2]) * the_∇_b ^ 2
     m̂_b = adam_info.m_b / (1 - adam_info.β[1] ^ t)
     v̂_b = adam_info.v_b / (1 - adam_info.β[2] ^ t)
-    model.b -= adam_info.α * m̂_b / (sqrt(v̂_b) .+ adam_info.epsilon)
+    model.b -= adam_info.α * m̂_b / (sqrt(v̂_b) + adam_info.ϵ)
 	return nothing
 end
 

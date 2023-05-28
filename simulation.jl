@@ -160,8 +160,8 @@ set learning rate and number of epochs for gradient descent.
 
 # ╔═╡ abbb1485-8652-4cc5-b749-ab93db6b64fc
 begin
-	α = 0.016
-	nb_epochs = 350
+	α = 0.02
+	nb_epochs = 250
 end
 
 # ╔═╡ ff07a8bf-4fe4-46ca-a929-d64b557903d6
@@ -176,7 +176,8 @@ begin
 end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, nb_epochs=nb_epochs, α=α, record_loss=true)
+perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
+	nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true)
 
 # ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 mean(perf_metrics[:, opt_hps_id]) # best cross-validation perf
@@ -188,10 +189,13 @@ fig_losses
 md"## train model with opt hyper-params"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α)
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true)
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
 viz_loss(losses, save_fig=true)
+
+# ╔═╡ 479c0086-0474-448c-a2f9-8ae75aadcc80
+losses[end]
 
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 set_opt_cutoff!(model, raw_data, data.ids_obs)
@@ -403,6 +407,7 @@ end
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
 # ╠═a3457343-dc4d-4046-83d3-b7bdc20c427c
 # ╠═a58e7958-458f-4900-8de3-f4eeae945710
+# ╠═479c0086-0474-448c-a2f9-8ae75aadcc80
 # ╠═33e459c3-0d6a-4999-816f-54069bbad86f
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
