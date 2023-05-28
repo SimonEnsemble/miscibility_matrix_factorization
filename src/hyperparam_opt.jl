@@ -59,5 +59,5 @@ function do_hyperparam_optimization(
     opt_hps_id = argmax(mean_perf_over_folds)
 	opt_hyperparams = hyperparams[opt_hps_id]
 
-	return perf_metrics, opt_hyperparams, fig_losses
+	return perf_metrics, opt_hps_id, opt_hyperparams, fig_losses
 end
