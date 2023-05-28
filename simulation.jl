@@ -179,6 +179,9 @@ end
 perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
 	nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true)
 
+# ╔═╡ 65af0efe-5c23-4bc8-898a-ef7a5b43e479
+opt_hyperparams
+
 # ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 mean(perf_metrics[:, opt_hps_id]) # best cross-validation perf
 
@@ -201,7 +204,7 @@ losses[end]
 set_opt_cutoff!(model, raw_data, data.ids_obs)
 
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
-viz_latent_space(model, raw_data)
+viz_latent_space(model, raw_data, save_fig=true)
 
 # ╔═╡ 1069ec41-4733-4111-becd-043a104d1c35
 md"
@@ -225,7 +228,7 @@ perf.cm
 viz_confusion(perf.cm, save_fig=true)
 
 # ╔═╡ 1ce32f38-22e1-43a1-8aa8-49141573208c
-md"## baseline model
+md"## baseline models
 
 (random forest)
 "
@@ -252,6 +255,27 @@ begin
 	@assert sum([raw_data.M_complete[i, j] for (i, j) in data.ids_missing] .== 1) == sum(baseline_guessing.cm[2, :]) # sum of second row is truly miscible
 	@assert sum([raw_data.M_complete[i, j] for (i, j) in data.ids_missing] .== 0) == sum(baseline_guessing.cm[1, :]) # sum of first row is truly immisible
 end
+
+# ╔═╡ d02ee133-9ee6-4ce0-84db-fcdfb78d6830
+md"ordinary LMF"
+
+# ╔═╡ 12825032-0994-4d7c-90ef-e473596fb42b
+lmf_hyperparams = (;k=opt_hyperparams.k, λ=opt_hyperparams.λ, use_features=false, σ=nothing, γ=0.0)
+
+# ╔═╡ d48a8ef3-4d6e-4378-a206-0901f8cc28e0
+lmf_model, _ = construct_train_model(lmf_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true)
+
+# ╔═╡ 638b1fa7-b664-4173-8a88-271e7e9ba809
+set_opt_cutoff!(lmf_model, raw_data, data.ids_obs)
+
+# ╔═╡ 2d2ee780-6d9f-4ca8-84f3-b652349b290c
+lmf_perf = compute_perf_metrics(lmf_model, raw_data, data.ids_missing)
+
+# ╔═╡ 7bcf3a25-b298-4638-8c7c-7e39c4e808c9
+viz_confusion(lmf_perf.cm)
+
+# ╔═╡ 515d942e-b72f-40f1-a288-4d89aed61d56
+viz_latent_space(lmf_model, raw_data, append_filename="lmf", save_fig=true)
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
@@ -289,14 +313,15 @@ end
 
 # ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 function balanced_acc_boxplot(θs, θ_to_perf)
-	models = ["GR-MF", "MF", "RF", "guess"]
+	models = ["GR-LMF", "LMF", "RF", "guess"]
 	model_to_dodge = Dict(zip(models, 1:length(models)))
 	model_to_color = Dict(zip(models, ColorSchemes.Accent_4))
 
 	# panel for each θ.
-	fig = Figure(resolution=(700, 400))
+	fig = Figure(resolution=(600, 400))
 	axs = [Axis(fig[1, i], 
-				xlabel=i == 2 ? "model" : "", 
+				xlabel=i == 2 ? "model" : "",
+				xticklabelrotation=π/2,
 				ylabel=i == 1 ? "balanced accuracy" : "",
 				xticks=(1:length(models), models),
 				title="θ = $(θs[i])"
@@ -400,6 +425,7 @@ end
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
+# ╠═65af0efe-5c23-4bc8-898a-ef7a5b43e479
 # ╠═b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
@@ -419,6 +445,13 @@ end
 # ╠═9e0e2df4-e71b-4fe7-ab63-e7c3402756df
 # ╠═2b00c2ae-ceba-4fcd-8ea5-9dae2013ee2b
 # ╠═19d0a18c-ad97-4f76-8cb5-fb3b0cc830d3
+# ╟─d02ee133-9ee6-4ce0-84db-fcdfb78d6830
+# ╠═12825032-0994-4d7c-90ef-e473596fb42b
+# ╠═d48a8ef3-4d6e-4378-a206-0901f8cc28e0
+# ╠═638b1fa7-b664-4173-8a88-271e7e9ba809
+# ╠═2d2ee780-6d9f-4ca8-84f3-b652349b290c
+# ╠═7bcf3a25-b298-4638-8c7c-7e39c4e808c9
+# ╠═515d942e-b72f-40f1-a288-4d89aed61d56
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f

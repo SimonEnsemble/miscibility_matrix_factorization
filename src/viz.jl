@@ -109,7 +109,7 @@ function viz_loss(losses::Vector{Float64}; save_fig::Bool=false)
 	fig
 end
 
-function viz_latent_space(model::MFModel, raw_data::RawData; incl_legend::Bool=true)
+function viz_latent_space(model::MFModel, raw_data::RawData; incl_legend::Bool=true, save_fig::Bool=false, append_filename::String="")
 	do_pca = size(model.C)[1] != 2
 
 	if do_pca
@@ -145,9 +145,11 @@ function viz_latent_space(model::MFModel, raw_data::RawData; incl_legend::Bool=t
              )
 	end
     if incl_legend
-        Legend(fig[0, 1], sps, classes, orientation=:horizontal)
+        Legend(fig[0, 1], sps, lowercase.(classes), orientation=:horizontal)
     end
-    save("latent_space.pdf", fig)
+    if save_fig
+        save("latent_space" * append_filename * ".pdf", fig)
+    end
 	return fig
 end
 
