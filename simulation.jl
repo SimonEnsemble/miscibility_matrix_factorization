@@ -179,6 +179,9 @@ end
 perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
 	nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true)
 
+# ╔═╡ 65af0efe-5c23-4bc8-898a-ef7a5b43e479
+opt_hyperparams
+
 # ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 mean(perf_metrics[:, opt_hps_id]) # best cross-validation perf
 
@@ -272,7 +275,7 @@ lmf_perf = compute_perf_metrics(lmf_model, raw_data, data.ids_missing)
 viz_confusion(lmf_perf.cm)
 
 # ╔═╡ 515d942e-b72f-40f1-a288-4d89aed61d56
-viz_latent_space(lmf_model, raw_data)
+viz_latent_space(lmf_model, raw_data, append_filename="lmf", save_fig=true)
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
@@ -422,6 +425,7 @@ end
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
+# ╠═65af0efe-5c23-4bc8-898a-ef7a5b43e479
 # ╠═b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
