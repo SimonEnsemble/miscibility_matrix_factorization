@@ -19,7 +19,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf
+	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf, JLD2
 	using MiscibilityMF
 end
 
@@ -277,6 +277,15 @@ viz_confusion(lmf_perf.cm)
 # ╔═╡ 515d942e-b72f-40f1-a288-4d89aed61d56
 viz_latent_space(lmf_model, raw_data, append_filename="lmf", save_fig=true)
 
+# ╔═╡ f5d6f5c5-92ae-435e-9d4a-17890d49bc64
+md"## loss without Adam, for comparison"
+
+# ╔═╡ d4ce1f41-c8a3-4524-836e-e3099abfae92
+_, _losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=false)
+
+# ╔═╡ 621c8c22-e093-4d55-8e80-1d8b81646e69
+viz_loss(_losses, save_fig=true, append_filename="without_adam")
+
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
 
@@ -296,7 +305,24 @@ if do_multiple_runs
 		mf_settings = (; α=α, nb_hyperparams=nb_hyperparams, nb_epochs=nb_epochs, use_adam=true)
 		θ_to_perf[θ] = run_experiments(θ, raw_data, nruns, mf_settings)
 	end
+	jldsave("multiple_runs.jld2"; θ_to_perf)
+else
+	θ_to_perf = load_object("results_$(nruns)_runs.jld2")
 end
+
+# ╔═╡ fe624b98-6283-42d6-86db-ef641edc3a68
+md"standard deviation of performance"
+
+# ╔═╡ 29eafcac-3054-44e5-89b0-a93fc981b534
+for θ in θs
+	σ = std(filter(
+		row -> (row["model"] == "GR-LMF") && (row["metric"] == "balanced_accuracy"), 
+		θ_to_perf[θ])[:, "score"])
+	@show (θ, σ)
+end
+
+# ╔═╡ 112e75a8-73e0-429f-9afd-5d4636b0e31c
+md"save results to file"
 
 # ╔═╡ 5906e98f-2d7d-4416-abf0-7d64e927bb40
 if do_multiple_runs
@@ -307,9 +333,12 @@ if do_multiple_runs
 			Gadfly.Guide.title("θ = $θ"),
 			Gadfly.Coord.cartesian(ymin=0.4, ymax=1.0)
 		)
-		p |> Gadfly.PDF("results_$θ.pdf")
+		p |> Gadfly.PDF("results_$(θ)_$(nruns)_runs.pdf")
 	end
 end
+
+# ╔═╡ cb4d2a81-1c16-46ca-9f40-a8f3d298bdd4
+
 
 # ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 function balanced_acc_boxplot(θs, θ_to_perf)
@@ -367,7 +396,7 @@ end
 
 # ╔═╡ 3c8a8663-d588-44b8-a244-e84e7ef964dc
 if do_multiple_runs
-	viz_hyperparam(:λ, θ_to_perf[0.2])
+	viz_hyperparam(:λ, θ_to_perf[0.8])
 end
 
 # ╔═╡ c09d65a7-3457-4a5a-8521-d01513797dd2
@@ -452,11 +481,18 @@ end
 # ╠═2d2ee780-6d9f-4ca8-84f3-b652349b290c
 # ╠═7bcf3a25-b298-4638-8c7c-7e39c4e808c9
 # ╠═515d942e-b72f-40f1-a288-4d89aed61d56
+# ╟─f5d6f5c5-92ae-435e-9d4a-17890d49bc64
+# ╠═d4ce1f41-c8a3-4524-836e-e3099abfae92
+# ╠═621c8c22-e093-4d55-8e80-1d8b81646e69
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
 # ╠═ea48a8dd-d504-4025-bab4-b2f57e1fd256
+# ╟─fe624b98-6283-42d6-86db-ef641edc3a68
+# ╠═29eafcac-3054-44e5-89b0-a93fc981b534
+# ╟─112e75a8-73e0-429f-9afd-5d4636b0e31c
 # ╠═5906e98f-2d7d-4416-abf0-7d64e927bb40
+# ╠═cb4d2a81-1c16-46ca-9f40-a8f3d298bdd4
 # ╠═cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 # ╠═43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
 # ╠═d9ae5b52-22c1-4559-9084-ec38bf3fb4a7

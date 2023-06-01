@@ -99,12 +99,12 @@ end
 
 _viz_loss!(ax, losses::Vector{Float64}) = lines!(ax, 1:length(losses), losses)
 
-function viz_loss(losses::Vector{Float64}; save_fig::Bool=false)
+function viz_loss(losses::Vector{Float64}; save_fig::Bool=false, append_filename::String="")
     fig = Figure()
     ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
     _viz_loss!(ax, losses)
     if save_fig
-        save("loss.pdf", fig)
+        save("loss" * append_filename * ".pdf", fig)
     end
     fig
 end
