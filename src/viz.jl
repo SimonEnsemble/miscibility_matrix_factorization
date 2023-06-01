@@ -20,7 +20,7 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
 
     fig = Figure(resolution=(1450, 1450))
     ax  = Axis(fig[1, 1], 
-        xlabel="compound", ylabel="compound", 
+        xlabel="solution", ylabel="solution", 
         xgridvisible=false, 
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
