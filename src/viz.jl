@@ -110,7 +110,7 @@ function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
 
     fig = Figure(resolution=(1450, 1450))#(size(model.C)[1] * 1450 / raw_data.n_compounds, 1450))
     ax  = Axis(fig[1, 1],
-        xlabel="solution", ylabel="latent dimension",
+        xlabel="solution", ylabel="latent\ndim.",
         xgridvisible=false,
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
