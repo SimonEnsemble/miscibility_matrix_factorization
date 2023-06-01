@@ -206,6 +206,9 @@ set_opt_cutoff!(model, raw_data, data.ids_obs)
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
 viz_latent_space(model, raw_data, save_fig=true)
 
+# ╔═╡ 7a31f94e-d779-4e67-8333-0346c9445ed4
+viz_C(model, raw_data, true)
+
 # ╔═╡ 1069ec41-4733-4111-becd-043a104d1c35
 md"
 
@@ -463,6 +466,7 @@ end
 # ╠═479c0086-0474-448c-a2f9-8ae75aadcc80
 # ╠═33e459c3-0d6a-4999-816f-54069bbad86f
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
+# ╠═7a31f94e-d779-4e67-8333-0346c9445ed4
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
 # ╠═cf67313d-8b14-40e1-abfd-ab559450e098
 # ╠═29400905-c956-4272-b721-9896a41ffce1
