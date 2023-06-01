@@ -148,8 +148,9 @@ function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
         linkxaxes!(ax, t_ax)
         ylims!(t_ax, 0, 2) # to see text
     end
-    colsize!(fig.layout, 1, Aspect(1, 1.0))
-    Colorbar(fig[end+1, :], hm, label="Cᵢⱼ", vertical=false)
+    #colsize!(fig.layout, 1, Aspect(1, 1.0))
+    rowsize!(fig.layout, 1, Fixed(pixelarea(ax.scene)[].widths[2]))
+    Colorbar(fig[:, end+1], hm, label="Cᵢⱼ")
     # this messes up the brackets
     if draw_brackets
        notify(t_ax.finallimits)
