@@ -10,13 +10,18 @@ class_to_color = Dict(zip(["Polymer", "Protein", "Salt", "Surfactant"],
 # a = RGB.(Gadfly.Scale.color_discrete_hue().f(4))
 miscibility_colormap = reverse(ColorSchemes.:batlow)
 
-function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
-    big_fontsize = 50
-
+function pretty_compound_labels(raw_data::RawData)
     the_compound_labels = rich.(raw_data.compounds)
     # subscripts
     the_compound_labels[findfirst(raw_data.compounds .== "K2HPO4")] = rich("K", subscript("2"), "HPO", subscript("4"))
     the_compound_labels[findfirst(raw_data.compounds .== "Na2HPO4")] = rich("Na", subscript("2"), "HPO", subscript("4"))
+    return the_compound_labels
+end
+
+function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
+    big_fontsize = 50
+    
+    the_compound_labels = pretty_compound_labels(raw_data)
 
     fig = Figure(resolution=(1450, 1450))
     ax  = Axis(fig[1, 1], 
@@ -26,7 +31,7 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
         ylabelsize=big_fontsize,
         ygridvisible=false, 
         xticks=(1:raw_data.n_compounds, the_compound_labels),
-        yticks=(1:raw_data.n_compounds, reverse(raw_data.compounds)),
+        yticks=(1:raw_data.n_compounds, reverse(the_compound_labels)),
         xticklabelrotation=π/2
     )
     if ! draw_brackets
@@ -94,6 +99,64 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
     else
         save("miscibility_matrix_complete.pdf", fig)
     end
+    return fig
+end
+
+function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
+    big_fontsize = 50
+
+    the_compound_labels = pretty_compound_labels(raw_data)
+    colormap = reverse(ColorSchemes.diverging_gwr_55_95_c38_n256)
+
+    fig = Figure(resolution=(1450, 1450))#(size(model.C)[1] * 1450 / raw_data.n_compounds, 1450))
+    ax  = Axis(fig[1, 1],
+        xlabel="solution", ylabel="latent dimension",
+        xgridvisible=false,
+        xlabelsize=big_fontsize,
+        ylabelsize=big_fontsize,
+        ygridvisible=false,
+        xticks=(1:raw_data.n_compounds, the_compound_labels),
+        yticks=1:size(model.C)[1],
+        xticklabelrotation=π/2,
+        aspect=DataAspect()
+    )
+    max_value = maximum(abs.(model.C))
+    hm = heatmap!(ax, reverse(model.C', dims=2), colormap=colormap, colorrange=(-max_value, max_value))
+    for i = 1:raw_data.n_compounds+1
+        vlines!(ax, i - 0.5, color="gray", linewidth=1)
+    end
+    for i = 1:size(model.C)[1]+1
+        hlines!(ax, i - 0.5, color="gray", linewidth=1)
+    end
+    if draw_brackets
+        # add brackets to indicate the class of the compound
+        t_ax = Axis(fig[1, 1, Top()], height=50, xautolimitmargin=(0, 0))
+        hidedecorations!(t_ax)
+        hidespines!(t_ax)
+
+        c0 = 0.5
+        for c in unique(raw_data.classes) # loop thru classes
+            l = sum(raw_data.classes .== c) # number of instances of this class
+
+            # draw brackets on top
+            bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8, 
+                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+
+            c0 += l
+        end
+
+        linkxaxes!(ax, t_ax)
+        ylims!(t_ax, 0, 2) # to see text
+    end
+    colsize!(fig.layout, 1, Aspect(1, 1.0))
+    Colorbar(fig[end+1, :], hm, label="Cᵢⱼ", vertical=false)
+    # this messes up the brackets
+    if draw_brackets
+       notify(t_ax.finallimits)
+       notify(ax.finallimits)
+    end
+    resize_to_layout!(fig)
+    save("C.pdf", fig)
     return fig
 end
 
