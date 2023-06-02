@@ -193,7 +193,7 @@ function viz_loss(losses::Vector{Float64}; save_fig::Bool=false, append_filename
     fig
 end
 
-function viz_latent_space_3d(model::MFModel, raw_data::RawData)
+function viz_latent_space_3d(model::MFModel, raw_data::RawData; append_filename::String="")
     if size(model.C)[1] != 3
         error("this for k = 3")
     end
@@ -208,6 +208,10 @@ function viz_latent_space_3d(model::MFModel, raw_data::RawData)
 		zgridvisible=true,
 		aspect=:data
 	)
+    # draw axes
+    lines!([-5, 5], [0, 0], [0, 0], color="black", linewidth=1)
+    lines!([0, 0], [-5, 5], [0, 0], color="black", linewidth=1)
+    lines!([0, 0], [0, 0], [-5, 5], color="black", linewidth=1)
 	classes = unique(raw_data.classes)
 	sps = []
 	for c in classes
@@ -216,10 +220,13 @@ function viz_latent_space_3d(model::MFModel, raw_data::RawData)
 				color=class_to_color[c], label=c)
 		)
 	end
-	hlines!(ax, 0)
+    the_lims = 1.1 * maximum(abs.(model.C))
+    xlims!(-the_lims, the_lims)
+    ylims!(-the_lims, the_lims)
+    zlims!(-the_lims, the_lims)
 	Legend(fig[1, 2], sps, lowercase.(classes), orientation=:vertical)
 	#resize_to_layout!(fig)
-	save("3d_latent_space.pdf", fig)
+	save("3d_latent_space" * append_filename * ".pdf", fig)
 	return fig
 end
 
