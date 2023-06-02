@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.26
+# v0.19.25
 
 using Markdown
 using InteractiveUtils
@@ -68,6 +68,14 @@ function draw_matrix()
 		hidespines!(a)
 	end
 
+	for i = 1:n
+		for j = 1:n
+			if isnan(reverse(M', dims=2)[i, j])
+				text!(ax, i, j, text="?", align=(:center, :center), font=AlgebraOfGraphics.firasans("Light"))
+			end
+		end
+	end
+
 	
 	classes = ["category X", "category X", "category X", "category Y", "category Y"]
 	@assert length(classes) == n
@@ -102,11 +110,11 @@ function draw_matrix()
 		PolyElement(color=miscibility_colormap[end], strokecolor="gray", polystrokewidth=1)
 	]
 	legend_labels = ["immiscible", "miscible"]
-	legend_patchsize = (35, 35)
+	legend_patchsize = (25, 25)
 	# if any(ismissing.(M))
-		push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
-		push!(legend_labels, "missing")
-		legend_patchsize = (14, 14, 14)
+		# push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
+		# push!(legend_labels, "missing")
+		# legend_patchsize = (14, 14, 14)
 	# end
 	resize_to_layout!(fig)
 #     # this messes up the brackets
