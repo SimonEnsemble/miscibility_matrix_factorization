@@ -292,6 +292,9 @@ viz_confusion(lmf_perf.cm)
 # ╔═╡ 515d942e-b72f-40f1-a288-4d89aed61d56
 viz_latent_space(lmf_model, raw_data, append_filename="lmf", save_fig=true)
 
+# ╔═╡ d935b22f-5121-41c1-8408-c71c0e53f130
+viz_latent_space_3d(lmf_model, raw_data, append_filename="lmf")
+
 # ╔═╡ f5d6f5c5-92ae-435e-9d4a-17890d49bc64
 md"## loss without Adam, for comparison"
 
@@ -501,6 +504,7 @@ end
 # ╠═2d2ee780-6d9f-4ca8-84f3-b652349b290c
 # ╠═7bcf3a25-b298-4638-8c7c-7e39c4e808c9
 # ╠═515d942e-b72f-40f1-a288-4d89aed61d56
+# ╠═d935b22f-5121-41c1-8408-c71c0e53f130
 # ╟─f5d6f5c5-92ae-435e-9d4a-17890d49bc64
 # ╠═d4ce1f41-c8a3-4524-836e-e3099abfae92
 # ╠═621c8c22-e093-4d55-8e80-1d8b81646e69
