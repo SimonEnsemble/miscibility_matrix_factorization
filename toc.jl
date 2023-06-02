@@ -9,7 +9,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 	
-	using CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf, Graphs, GraphMakie
+	using CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf, Graphs, GraphMakie, NetworkLayout
 end
 
 # ╔═╡ a6f849fe-3a37-48ce-bb1c-6d902ea49747
@@ -28,11 +28,12 @@ end
 
 # ╔═╡ f2abfddc-2a83-4c12-b071-84aefff6d665
 begin
-	n = 5
-	M = ones(n, n)
+	n = 10
+	M   = ones(n, n)
+	M_c = similar(M)
 	for i = 1:n
 		for j = i+1:n
-			M[i, j] = M[j,  i] = rand([0, 1])
+			M[i, j] = M[j,  i] = M_c[i, j] = M_c[j, i] = rand([0, 1])
 			if rand() < 1/2
 				M[i, j] = M[j,  i] = NaN
 			end
@@ -41,8 +42,16 @@ begin
 	M
 end
 
+# ╔═╡ 7827f454-70fc-447c-98da-5331d3ee350d
+classes = vcat(["polymer" for _ = 1:3],
+				["surfactant" for _ = 4:8],
+				["salt" for i = 9:10])
+
+# ╔═╡ 6b4cac48-bcb5-4535-a6a1-6fafd4bc6984
+class_to_color = Dict(zip(unique(classes), ColorSchemes.Paired_5[2:4]))
+
 # ╔═╡ df62dc83-d6b8-4e62-819b-5c25d2354333
-function draw_matrix()
+function draw_matrix(M)
 	miscibility_colormap = reverse(ColorSchemes.:Egypt)
 	 
 	fig = Figure(resolution=(400, 400))
@@ -76,31 +85,32 @@ function draw_matrix()
 		end
 	end
 
-	
-	classes = ["category X", "category X", "category X", "category Y", "category Y"]
 	@assert length(classes) == n
-	class_to_color = Dict(zip(unique(classes), ColorSchemes.Egypt[[2, 3]]))
 	c0 = 0.5
-	for c in unique(classes) # loop thru classes
-		
-		l = sum(classes .== c) # number of instances of this class
+	if any(isnan.(M))
+		for c in unique(classes) # loop thru classes
+			
+			l = sum(classes .== c) # number of instances of this class
+	
+			# draw brackets on top
+			bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, 
+				fontsize=14,#fontsize=big_fontsize/1.8,
+					 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+	
+			# draw brackets on right
+			bracket!(r_ax, 0, n + 1 - (c0 + l) + 0.5, 0, n + 1 - c0 - 0.5,
+				fontsize=14,
+					 orientation=:down,# fontsize=big_fontsize/1.8,
+					 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+	
+			c0 += l
+		end
 
-		# draw brackets on top
-		bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, #fontsize=big_fontsize/1.8,
-				 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
-
-		# draw brackets on right
-		bracket!(r_ax, 0, n + 1 - (c0 + l) + 0.5, 0, n + 1 - c0 - 0.5,
-				 orientation=:down,# fontsize=big_fontsize/1.8,
-				 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
-
-		c0 += l
+		linkxaxes!(ax, t_ax)
+		linkyaxes!(ax, r_ax)
+		ylims!(t_ax, 0, 2) # to see text
+		xlims!(r_ax, 0, 2) # to see text
 	end
-
-	linkxaxes!(ax, t_ax)
-	linkyaxes!(ax, r_ax)
-	ylims!(t_ax, 0, 2) # to see text
-	xlims!(r_ax, 0, 2) # to see text
 	colsize!(fig.layout, 1, Aspect(1, 1.0))
 
 	
@@ -110,7 +120,7 @@ function draw_matrix()
 		PolyElement(color=miscibility_colormap[end], strokecolor="gray", polystrokewidth=1)
 	]
 	legend_labels = ["immiscible", "miscible"]
-	legend_patchsize = (25, 25)
+	legend_patchsize = (20, 20)
 	# if any(ismissing.(M))
 		# push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
 		# push!(legend_labels, "missing")
@@ -119,37 +129,58 @@ function draw_matrix()
 	resize_to_layout!(fig)
 #     # this messes up the brackets
 	Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal)
-	# if draw_brackets
+	if any(isnan.(M))
+		
 		notify(t_ax.finallimits)
 		notify(r_ax.finallimits)
-	# end
-	save("toc_M.pdf", fig)
+	end
+	if any(isnan.(M))
+		save("toc_M.pdf", fig)
+	else
+		save("toc_M_complete.pdf", fig)
+	end
 	fig
 end
 
 # ╔═╡ bd41e64a-6805-4611-bf84-ce1b33747244
-draw_matrix()
+draw_matrix(M)
+
+# ╔═╡ 4248935c-9f4c-4923-bf14-6135b60c78af
+draw_matrix(M_c)
 
 # ╔═╡ 33cd9c06-ae76-49c5-9942-23d4a9cfec42
 begin
-	graph = SimpleGraph(5)
-	add_edge!(graph, 1, 2)
-	add_edge!(graph, 3, 4)
-	add_edge!(graph, 4, 5)
-	add_edge!(graph, 3, 5)
+	graph = SimpleGraph(n)
+	for i = 1:n
+		for j = 1:n
+			if i == j
+				continue
+			end
+			if classes[i] == classes[j]
+				add_edge!(graph, i, j)
+			end
+		end
+	end
 
 	f, ax, p = graphplot(graph, node_size=30, 
-		node_color=vcat([ColorSchemes.Egypt[3] for i = 1:2], [ColorSchemes.Egypt[2] for i = 3:5])
+		node_color=[class_to_color[c] for c in classes], layout=Spring(C=10)
 		)
 	hidedecorations!(ax); hidespines!(ax)
 	save("toc_G.pdf", f)
 	f
 end
 
+# ╔═╡ 53db750c-52c3-48af-acc8-b24babe63964
+classes
+
 # ╔═╡ Cell order:
 # ╠═3501318c-0035-11ee-1fd1-ffd79845d836
 # ╠═a6f849fe-3a37-48ce-bb1c-6d902ea49747
 # ╠═f2abfddc-2a83-4c12-b071-84aefff6d665
+# ╠═7827f454-70fc-447c-98da-5331d3ee350d
+# ╠═6b4cac48-bcb5-4535-a6a1-6fafd4bc6984
 # ╠═df62dc83-d6b8-4e62-819b-5c25d2354333
 # ╠═bd41e64a-6805-4611-bf84-ce1b33747244
+# ╠═4248935c-9f4c-4923-bf14-6135b60c78af
 # ╠═33cd9c06-ae76-49c5-9942-23d4a9cfec42
+# ╠═53db750c-52c3-48af-acc8-b24babe63964
