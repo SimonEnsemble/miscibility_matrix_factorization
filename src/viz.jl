@@ -8,7 +8,29 @@ class_to_color = Dict(zip(["Polymer", "Protein", "Salt", "Surfactant"],
                            RGB(1.0, 0.426407, 0.681544),
                            RGB(0.0, 0.71687746, 0.55441886)])) # from gadfly
 # a = RGB.(Gadfly.Scale.color_discrete_hue().f(4))
-miscibility_colormap = reverse(ColorSchemes.:batlow)
+miscibility_colormap = reverse(ColorSchemes.:buda)
+label_to_color = Dict(0 => miscibility_colormap[1], 1 => miscibility_colormap[end])
+label_to_string = Dict(0 => "immiscible", 1 => "miscible")
+
+function viz_imputations(model::MFModel, data::MiscibilityData, raw_data::RawData)
+miscibility_colormap = reverse(ColorSchemes.:buda)
+label_to_color = Dict(0 => miscibility_colormap[1], 1 => miscibility_colormap[end])
+    m     = [raw_data.M_complete[i, j] for (i, j) in data.ids_missing]
+	m̂_raw = [pred_mᵢⱼ(model, i, j)     for (i, j) in data.ids_missing]
+
+    fig = Figure()
+    ax = Axis(fig[1, 1], xlabel="σ(cᵢ ⋅ cⱼ + b)", ylabel="# pairs of solutions")
+    for c in [0, 1]
+        density!(m̂_raw[m .== c], color=(label_to_color[c], 0.5), label=label_to_string[c], 
+                 strokewidth=1, linewidth=2, strokecolor="black")
+    end
+    vlines!(ax, model.cutoff, linestyle=:dash, color="black", linewidth=2)
+    axislegend(position=:lt)
+    ylims!(0, nothing)
+    xlims!(0, 1)
+    save("viz_imputations.pdf", fig)
+	return fig
+end
 
 function pretty_compound_labels(raw_data::RawData)
     the_compound_labels = rich.(raw_data.compounds)
@@ -171,6 +193,36 @@ function viz_loss(losses::Vector{Float64}; save_fig::Bool=false, append_filename
         save("loss" * append_filename * ".pdf", fig)
     end
     fig
+end
+
+function viz_latent_space_3d(model::MFModel, raw_data::RawData)
+    if size(model.C)[1] != 3
+        error("this for k = 3")
+    end
+
+    fig = Figure()
+	ax = Axis3(fig[1, 1],
+		xlabel="latent dim. 1",
+		ylabel="latent dim. 2",
+		zlabel="latent dim. 3",
+		xgridvisible=true,
+		ygridvisible=true,
+		zgridvisible=true,
+		aspect=:data
+	)
+	classes = unique(raw_data.classes)
+	sps = []
+	for c in classes
+		push!(sps,
+			scatter!(model.C[:, raw_data.classes .== c],
+				color=class_to_color[c], label=c)
+		)
+	end
+	hlines!(ax, 0)
+	Legend(fig[1, 2], sps, lowercase.(classes), orientation=:vertical)
+	#resize_to_layout!(fig)
+	save("3d_latent_space.pdf", fig)
+	return fig
 end
 
 function viz_latent_space(model::MFModel, raw_data::RawData; incl_legend::Bool=true, save_fig::Bool=false, append_filename::String="")

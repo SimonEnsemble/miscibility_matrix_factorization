@@ -203,8 +203,17 @@ losses[end]
 # ╔═╡ 33e459c3-0d6a-4999-816f-54069bbad86f
 set_opt_cutoff!(model, raw_data, data.ids_obs)
 
+# ╔═╡ 17ffbe7f-b496-470f-b92c-6a78f8c551e5
+viz_imputations(model, data, raw_data)
+
+# ╔═╡ 22b47934-4838-43bc-8e8c-b628db62af7c
+md"### latent space"
+
 # ╔═╡ 143582f4-83dc-4f38-befb-eb0109c37b7f
 viz_latent_space(model, raw_data, save_fig=true)
+
+# ╔═╡ b38dcbae-6895-466d-bc49-7a6865326469
+viz_latent_space_3d(model, raw_data)
 
 # ╔═╡ 7a31f94e-d779-4e67-8333-0346c9445ed4
 viz_C(model, raw_data, true)
@@ -220,6 +229,9 @@ precision = P(+ | pred +)
 
 does not even consider the negative, P(test - | -) = 1 - P(test + | -)
 "
+
+# ╔═╡ 6500c702-835b-4fd3-a54a-ad35e11c4111
+md"### performance"
 
 # ╔═╡ cf67313d-8b14-40e1-abfd-ab559450e098
 perf = compute_perf_metrics(model, raw_data, data.ids_missing)
@@ -465,9 +477,13 @@ end
 # ╠═a58e7958-458f-4900-8de3-f4eeae945710
 # ╠═479c0086-0474-448c-a2f9-8ae75aadcc80
 # ╠═33e459c3-0d6a-4999-816f-54069bbad86f
+# ╠═17ffbe7f-b496-470f-b92c-6a78f8c551e5
+# ╟─22b47934-4838-43bc-8e8c-b628db62af7c
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
+# ╠═b38dcbae-6895-466d-bc49-7a6865326469
 # ╠═7a31f94e-d779-4e67-8333-0346c9445ed4
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
+# ╟─6500c702-835b-4fd3-a54a-ad35e11c4111
 # ╠═cf67313d-8b14-40e1-abfd-ab559450e098
 # ╠═29400905-c956-4272-b721-9896a41ffce1
 # ╠═77b9fb17-63e6-4c2c-b0ee-e5919358b4dc
