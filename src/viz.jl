@@ -8,13 +8,11 @@ class_to_color = Dict(zip(["Polymer", "Protein", "Salt", "Surfactant"],
                            RGB(1.0, 0.426407, 0.681544),
                            RGB(0.0, 0.71687746, 0.55441886)])) # from gadfly
 # a = RGB.(Gadfly.Scale.color_discrete_hue().f(4))
-miscibility_colormap = reverse(ColorSchemes.:buda)
+miscibility_colormap = reverse(ColorSchemes.:batlow)
 label_to_color = Dict(0 => miscibility_colormap[1], 1 => miscibility_colormap[end])
 label_to_string = Dict(0 => "immiscible", 1 => "miscible")
 
 function viz_imputations(model::MFModel, data::MiscibilityData, raw_data::RawData)
-miscibility_colormap = reverse(ColorSchemes.:buda)
-label_to_color = Dict(0 => miscibility_colormap[1], 1 => miscibility_colormap[end])
     m     = [raw_data.M_complete[i, j] for (i, j) in data.ids_missing]
 	m̂_raw = [pred_mᵢⱼ(model, i, j)     for (i, j) in data.ids_missing]
 
