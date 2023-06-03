@@ -19,8 +19,8 @@ function viz_imputations(model::MFModel, data::MiscibilityData, raw_data::RawDat
     fig = Figure()
     ax = Axis(fig[1, 1], xlabel="σ(cᵢ ⋅ cⱼ + b)", ylabel="# pairs of solutions")
     for c in [0, 1]
-        density!(m̂_raw[m .== c], color=(label_to_color[c], 0.5), label=label_to_string[c], 
-                 strokewidth=1, linewidth=2, strokecolor="black")
+        hist!(m̂_raw[m .== c], color=(label_to_color[c], 0.5), label=label_to_string[c], 
+              strokewidth=1, linewidth=2, strokecolor="black", bins=range(0.0, 1.0, length=11))
     end
     vlines!(ax, model.cutoff, linestyle=:dash, color="black", linewidth=2)
     axislegend(position=:lt)
