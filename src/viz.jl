@@ -136,7 +136,7 @@ function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
         ylabelsize=big_fontsize,
         ygridvisible=false,
         xticks=(1:raw_data.n_compounds, the_compound_labels),
-        yticks=1:size(model.C)[1],
+        yticks=(1:size(model.C)[1], ["$i" for i in reverse(1:size(model.C)[1])]),
         xticklabelrotation=π/2,
         aspect=DataAspect()
     )
