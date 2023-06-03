@@ -34,7 +34,7 @@ begin
 	for i = 1:n
 		for j = i+1:n
 			M[i, j] = M[j,  i] = M_c[i, j] = M_c[j, i] = rand([0, 1])
-			if rand() < 1/2
+			if rand() < 0.4
 				M[i, j] = M[j,  i] = NaN
 			end
 		end
@@ -42,9 +42,15 @@ begin
 	M
 end
 
+# ╔═╡ e4828911-6c24-4dd8-92b7-a4a7ec65b487
+M
+
+# ╔═╡ 5259f765-625f-43bd-95cf-aded752e5558
+M_c
+
 # ╔═╡ 7827f454-70fc-447c-98da-5331d3ee350d
-classes = vcat(["polymer" for _ = 1:3],
-				["surfactant" for _ = 4:8],
+classes = vcat(["surfactant" for _ = 1:3],
+				["polymer" for _ = 4:8],
 				["salt" for i = 9:10])
 
 # ╔═╡ 6b4cac48-bcb5-4535-a6a1-6fafd4bc6984
@@ -162,7 +168,7 @@ begin
 		end
 	end
 
-	f, ax, p = graphplot(graph, node_size=30, 
+	f, ax, p = graphplot(graph, node_size=30,
 		node_color=[class_to_color[c] for c in classes], layout=Spring(C=10)
 		)
 	hidedecorations!(ax); hidespines!(ax)
@@ -177,6 +183,8 @@ classes
 # ╠═3501318c-0035-11ee-1fd1-ffd79845d836
 # ╠═a6f849fe-3a37-48ce-bb1c-6d902ea49747
 # ╠═f2abfddc-2a83-4c12-b071-84aefff6d665
+# ╠═e4828911-6c24-4dd8-92b7-a4a7ec65b487
+# ╠═5259f765-625f-43bd-95cf-aded752e5558
 # ╠═7827f454-70fc-447c-98da-5331d3ee350d
 # ╠═6b4cac48-bcb5-4535-a6a1-6fafd4bc6984
 # ╠═df62dc83-d6b8-4e62-819b-5c25d2354333
