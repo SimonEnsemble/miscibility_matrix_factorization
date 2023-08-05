@@ -14,6 +14,7 @@ function __init__()
     @eval @sk_import metrics: (confusion_matrix, accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score)
     @eval @sk_import ensemble: RandomForestClassifier
     @eval @sk_import decomposition: PCA
+    @eval @sk_import inspection: permutation_importance
 end
 
 include.(
@@ -29,7 +30,7 @@ export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData
        compute_perf_metrics, # perf.jl
        do_hyperparam_optimization, # hyperparam_opt.jl
        set_opt_cutoff!, # set_cutoff.jl
-       viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, class_to_color, viz_category_miscibility, viz_C, viz_latent_space_3d, viz_imputations, # viz.jl
-       build_Xy, test_perf_baseline_model, test_perf_guessing, # baseline.jl
+       viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, class_to_color, viz_category_miscibility, viz_C, viz_latent_space_3d, viz_imputations, viz_rf_feature_importance, # viz.jl
+       build_Xy, test_perf_baseline_model, test_perf_guessing, rf_feature_importance, # baseline.jl
        gen_hyperparams, run_experiment, run_experiments # run_expt.jl
 end

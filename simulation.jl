@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.26
+# v0.19.27
 
 using Markdown
 using InteractiveUtils
@@ -304,6 +304,12 @@ _, _losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, r
 # ╔═╡ 621c8c22-e093-4d55-8e80-1d8b81646e69
 viz_loss(_losses, save_fig=true, append_filename="without_adam")
 
+# ╔═╡ 73e89a22-fded-47f6-a821-847b1ec13f9c
+md"## RF feature importance"
+
+# ╔═╡ c7072626-5b7f-4df4-9527-b094d78475d3
+viz_rf_feature_importance(data, raw_data)
+
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
 
@@ -508,6 +514,8 @@ end
 # ╟─f5d6f5c5-92ae-435e-9d4a-17890d49bc64
 # ╠═d4ce1f41-c8a3-4524-836e-e3099abfae92
 # ╠═621c8c22-e093-4d55-8e80-1d8b81646e69
+# ╟─73e89a22-fded-47f6-a821-847b1ec13f9c
+# ╠═c7072626-5b7f-4df4-9527-b094d78475d3
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f

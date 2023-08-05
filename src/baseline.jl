@@ -31,6 +31,27 @@ function build_Xy(data::MiscibilityData, raw_data::RawData)
     return X_train, y_train, X_test, y_test
 end
 
+function rf_feature_importance(
+    data::MiscibilityData,
+    raw_data::RawData
+)
+    X_train, y_train, X_test, y_test = build_Xy(data, raw_data)
+    
+    # train
+    rf = RandomForestClassifier()
+    rf.fit(X_train, y_train)
+
+    res = permutation_importance(
+        rf, X_test, y_test, n_repeats=100, scoring="balanced_accuracy"
+    )
+    
+    # features replicated twice to handle permutation invariance
+    nb_features = length(raw_data.features)
+    mean_importance = (res["importances_mean"][1:nb_features] + res["importances_mean"][nb_features+1:end]) / 2
+    std_importance = sqrt.((res["importances_std"][1:nb_features] .^ 2 + res["importances_std"][nb_features+1:end] .^ 2) / 2)
+    return mean_importance, std_importance
+end
+
 function test_perf_baseline_model(
     data::MiscibilityData,
     raw_data::RawData;

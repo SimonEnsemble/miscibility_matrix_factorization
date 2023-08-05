@@ -366,3 +366,24 @@ function viz_category_miscibility(raw_data::RawData)
     save("category_based_miscibility.pdf", fig)
     return fig
 end
+
+function viz_rf_feature_importance(
+    data::MiscibilityData,
+    raw_data::RawData
+)
+    μ_importance, σ_importance = rf_feature_importance(data, raw_data)
+
+    fig = Figure()
+	ax  = Axis(fig[1, 1],
+		xlabel="solution feature", ylabel="decrease of\nbalanced accuracy",
+		xticks=(1:length(raw_data.features), raw_data.features),
+		xticklabelrotation=π/2,
+        title="permutation-based feature importance"
+	)
+    bar_colors = map(i -> i > 0 ? "green" : "red", μ_importance)
+	barplot!(1:length(raw_data.features), μ_importance, color=bar_colors)
+	errorbars!(1:length(raw_data.features), μ_importance,
+		σ_importance, whiskerwidth=10)
+    save("rf_feature_importance.pdf", fig)
+	fig
+end
