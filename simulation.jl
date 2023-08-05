@@ -21,6 +21,7 @@ begin
 	
 	using Revise, PlutoUI, Distributions, DataFrames, ProgressMeter, CairoMakie, ColorSchemes, Random, LinearAlgebra, Printf, JLD2
 	using MiscibilityMF
+	import MLJBase: train_test_pairs, StratifiedCV
 end
 
 # ╔═╡ 006c7e92-e8a5-471e-92be-4d27134295f4
@@ -76,7 +77,7 @@ sum(raw_data.M_complete .== 0) / 2 # number immiscible
 raw_data.n_compounds * (raw_data.n_compounds - 1) / 2 # pairs
 
 # ╔═╡ f1c5c51c-1d5a-496f-b000-0dc0c8f3383d
-viz_miscibility_matrix(raw_data.M_complete, raw_data, draw_brackets=true)
+viz_miscibility_matrix(raw_data.M_complete, raw_data, draw_brackets=true, savename="miscibility_matrix_complete.pdf")
 
 # ╔═╡ 7dc9e6eb-095d-417d-9cff-534b702159d2
 raw_data.classes
@@ -145,7 +146,7 @@ length(data.ids_missing)
 the_compound_labels = rich.(raw_data.compounds)
 
 # ╔═╡ 8d1b193b-a66c-4f37-80ae-7083f93ceb78
-viz_miscibility_matrix(data.M, raw_data, draw_brackets=true)
+viz_miscibility_matrix(data.M, raw_data, draw_brackets=true, savename="miscibility_matrix.pdf")
 
 # ╔═╡ 86e8f156-dd43-496c-b040-b4772fe0c536
 raw_data.classes
@@ -176,8 +177,11 @@ begin
 end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
-perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
-	nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true)
+begin
+	nfolds = 3
+	perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
+		nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true, nfolds=nfolds)
+end
 
 # ╔═╡ 65af0efe-5c23-4bc8-898a-ef7a5b43e479
 opt_hyperparams
@@ -433,6 +437,68 @@ if do_multiple_runs
 	viz_hyperparam(:k, θ_to_perf[0.8])
 end
 
+# ╔═╡ 8f5043d8-0a44-4619-8659-2444acaae5d0
+md"# conceptualize our ML procedures
+viz cross-validation split
+"
+
+# ╔═╡ 7479de96-e20a-4f6b-a75b-71bb4a6126e9
+function viz_procedure(data, raw_data)
+	if ! isdir("viz_procedure")
+		mkdir("viz_procedure")
+	end
+	
+	# viz training data
+	viz_miscibility_matrix(data.M, raw_data, 
+		draw_brackets=false, show_solute_labels=false,
+		savename="viz_procedure/M_train.pdf", include_legend=false)
+
+	# build test data
+	M_test = deepcopy(data.M)
+	fill!(M_test, missing)
+	for (i, j) in data.ids_missing
+		M_test[i, j] = M_test[j, i] = raw_data.M_complete[i, j]
+	end
+	viz_miscibility_matrix(M_test, raw_data, 
+		draw_brackets=false, show_solute_labels=false,
+		savename="viz_procedure/M_test.pdf", include_legend=false)
+
+	# 3-folds cross-validation split
+	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
+							1:length(data.ids_obs),
+							[data.M[i, j] for (i, j) in data.ids_obs])
+
+	for (id_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
+		# get the list of matrix entries, vector of tuples
+		cv_train_entries = data.ids_obs[ids_cv_train]
+		cv_test_entries  = data.ids_obs[ids_cv_test]
+	
+		###
+		# create copy of data
+		# introduce additional missing values, where the cv-test data are.
+		M_train = deepcopy(data.M)
+		for (i, j) in cv_test_entries
+			# ablate entries
+			M_train[i, j] = missing
+			M_train[j, i] = missing
+		end
+		M_test = deepcopy(data.M)
+		for (i, j) in cv_train_entries
+			M_test[i, j] = missing
+			M_test[j, i] = missing
+		end
+		viz_miscibility_matrix(M_test, raw_data, draw_brackets=false, show_solute_labels=false,
+			savename="viz_procedure/M_fold_$(id_fold)_cv_test.pdf",
+			include_legend=false)
+		viz_miscibility_matrix(M_train, raw_data, draw_brackets=false, show_solute_labels=false,
+			savename="viz_procedure/M_fold_$(id_fold)_cv_train.pdf", 
+			include_legend=false)
+	end
+end
+
+# ╔═╡ 317b8e4f-1ad8-47f9-81f2-0271f8e704c7
+viz_procedure(data, raw_data)
+
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
 # ╠═006c7e92-e8a5-471e-92be-4d27134295f4
@@ -531,3 +597,6 @@ end
 # ╠═3c8a8663-d588-44b8-a244-e84e7ef964dc
 # ╠═c09d65a7-3457-4a5a-8521-d01513797dd2
 # ╠═f37c6347-17fe-4166-bcad-3f5951c70dcb
+# ╟─8f5043d8-0a44-4619-8659-2444acaae5d0
+# ╠═7479de96-e20a-4f6b-a75b-71bb4a6126e9
+# ╠═317b8e4f-1ad8-47f9-81f2-0271f8e704c7

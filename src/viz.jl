@@ -38,20 +38,25 @@ function pretty_compound_labels(raw_data::RawData)
     return the_compound_labels
 end
 
-function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
+function viz_miscibility_matrix(M, raw_data::RawData; 
+        draw_brackets::Bool=false, 
+        include_legend::Bool=true, 
+        savename::Union{String, Nothing}=nothing,
+        show_solute_labels::Bool=true
+)
     big_fontsize = 50
     
     the_compound_labels = pretty_compound_labels(raw_data)
 
     fig = Figure(resolution=(1450, 1450))
     ax  = Axis(fig[1, 1], 
-        xlabel="solution", ylabel="solution", 
+        xlabel=show_solute_labels ? "solution" : "", ylabel=show_solute_labels ? "solution" : "", 
         xgridvisible=false, 
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
         ygridvisible=false, 
-        xticks=(1:raw_data.n_compounds, the_compound_labels),
-        yticks=(1:raw_data.n_compounds, reverse(the_compound_labels)),
+        xticks=(1:raw_data.n_compounds, show_solute_labels ? the_compound_labels : ["" for _ = 1:raw_data.n_compounds]),
+        yticks=(1:raw_data.n_compounds, show_solute_labels ? reverse(the_compound_labels) : ["" for _ = 1:raw_data.n_compounds]),
         xticklabelrotation=π/2
     )
     if ! draw_brackets
@@ -94,30 +99,32 @@ function viz_miscibility_matrix(M, raw_data::RawData; draw_brackets::Bool=false)
         xlims!(r_ax, 0, 2) # to see text
         colsize!(fig.layout, 1, Aspect(1, 1.0))
     end
-
-    ## legend
-    legend_patches = [
-        PolyElement(color=miscibility_colormap[1], strokecolor="gray", polystrokewidth=1), 
-        PolyElement(color=miscibility_colormap[end], strokecolor="gray", polystrokewidth=1)
-    ]
-    legend_labels = ["immiscible", "miscible"]
-    legend_patchsize = (35, 35)
-    if any(ismissing.(M))
-        push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
-        push!(legend_labels, "missing")
-        legend_patchsize = (35, 35, 35)
-    end
     resize_to_layout!(fig)
-    # this messes up the brackets
-    Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal, labelsize=big_fontsize)
+
+    if include_legend
+        legend_patches = [
+            PolyElement(color=miscibility_colormap[1], strokecolor="gray", polystrokewidth=1), 
+            PolyElement(color=miscibility_colormap[end], strokecolor="gray", polystrokewidth=1)
+        ]
+        legend_labels = ["immiscible", "miscible"]
+        legend_patchsize = (35, 35)
+        if any(ismissing.(M))
+            push!(legend_patches, PolyElement(color="white", strokecolor="gray", polystrokewidth=1))
+            push!(legend_labels, "missing")
+            legend_patchsize = (35, 35, 35)
+        end
+        Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal, labelsize=big_fontsize)
+    end
+
     if draw_brackets
         notify(t_ax.finallimits)
         notify(r_ax.finallimits)
     end
-    if any(ismissing.(M))
-        save("miscibility_matrix.pdf", fig)
-    else
-        save("miscibility_matrix_complete.pdf", fig)
+    if ! isnothing(savename)
+        if split(savename, ".")[end] != "pdf"
+            savename *= ".pdf"
+        end
+        save(savename, fig)
     end
     return fig
 end
