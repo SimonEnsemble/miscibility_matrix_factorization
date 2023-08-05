@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.25
+# v0.19.27
 
 using Markdown
 using InteractiveUtils
@@ -18,7 +18,7 @@ begin
 	AlgebraOfGraphics.set_aog_theme!(fonts=[AlgebraOfGraphics.firasans("Light"), AlgebraOfGraphics.firasans("Light")])
 	the_resolution = (500, 380)
 	update_theme!(
-		fontsize=20, 
+		fontsize=25, 
 		linewidth=4,
 		markersize=14,
 		titlefont=AlgebraOfGraphics.firasans("Light"),
@@ -49,8 +49,8 @@ M
 M_c
 
 # ╔═╡ 7827f454-70fc-447c-98da-5331d3ee350d
-classes = vcat(["surfactant" for _ = 1:3],
-				["polymer" for _ = 4:8],
+classes = vcat(["polymer" for _ = 1:3],
+				["surfactant" for _ = 4:8],
 				["salt" for i = 9:10])
 
 # ╔═╡ 6b4cac48-bcb5-4535-a6a1-6fafd4bc6984
@@ -100,12 +100,12 @@ function draw_matrix(M)
 	
 			# draw brackets on top
 			bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, 
-				fontsize=14,#fontsize=big_fontsize/1.8,
+				fontsize=17,#fontsize=big_fontsize/1.8,
 					 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
 	
 			# draw brackets on right
 			bracket!(r_ax, 0, n + 1 - (c0 + l) + 0.5, 0, n + 1 - c0 - 0.5,
-				fontsize=14,
+				fontsize=17,
 					 orientation=:down,# fontsize=big_fontsize/1.8,
 					 font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
 	
@@ -134,9 +134,8 @@ function draw_matrix(M)
 	# end
 	resize_to_layout!(fig)
 #     # this messes up the brackets
-	Legend(fig[0, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal)
+	Legend(fig[2, 1], legend_patches, legend_labels, patchsize=legend_patchsize, orientation=:horizontal)
 	if any(isnan.(M))
-		
 		notify(t_ax.finallimits)
 		notify(r_ax.finallimits)
 	end
