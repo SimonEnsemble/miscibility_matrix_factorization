@@ -368,10 +368,12 @@ function viz_category_miscibility(raw_data::RawData)
 end
 
 function viz_rf_feature_importance(
-    data::MiscibilityData,
-    raw_data::RawData
+    raw_data::RawData,
+    θ::Float64,
+    nb_runs::Int
 )
-    μ_importance, σ_importance = rf_feature_importance(data, raw_data)
+    # get feature importance
+    μ_importance, σ_importance = rf_feature_importance(raw_data, θ, nb_runs)
 
     fig = Figure()
 	ax  = Axis(fig[1, 1],
@@ -384,6 +386,7 @@ function viz_rf_feature_importance(
 	barplot!(1:length(raw_data.features), μ_importance, color=bar_colors)
 	errorbars!(1:length(raw_data.features), μ_importance,
 		σ_importance, whiskerwidth=10)
+    Label(fig[1, 1], "θ = $(round(θ, digits=1))", tellwidth=false, tellheight=false, valign=0.9, halign=0.9)
     save("rf_feature_importance.pdf", fig)
 	fig
 end

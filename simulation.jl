@@ -307,8 +307,8 @@ viz_loss(_losses, save_fig=true, append_filename="without_adam")
 # ╔═╡ 73e89a22-fded-47f6-a821-847b1ec13f9c
 md"## RF feature importance"
 
-# ╔═╡ c7072626-5b7f-4df4-9527-b094d78475d3
-viz_rf_feature_importance(data, raw_data)
+# ╔═╡ da34e60e-b628-4af6-9d1d-1a64a50119d3
+viz_rf_feature_importance(raw_data, θ, 25)
 
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
@@ -515,7 +515,7 @@ end
 # ╠═d4ce1f41-c8a3-4524-836e-e3099abfae92
 # ╠═621c8c22-e093-4d55-8e80-1d8b81646e69
 # ╟─73e89a22-fded-47f6-a821-847b1ec13f9c
-# ╠═c7072626-5b7f-4df4-9527-b094d78475d3
+# ╠═da34e60e-b628-4af6-9d1d-1a64a50119d3
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f

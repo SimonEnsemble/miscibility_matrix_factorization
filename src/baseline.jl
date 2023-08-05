@@ -32,24 +32,47 @@ function build_Xy(data::MiscibilityData, raw_data::RawData)
 end
 
 function rf_feature_importance(
-    data::MiscibilityData,
-    raw_data::RawData
-)
-    X_train, y_train, X_test, y_test = build_Xy(data, raw_data)
-    
-    # train
-    rf = RandomForestClassifier()
-    rf.fit(X_train, y_train)
+    raw_data::RawData,
+    θ::Float64,
+    nb_runs::Int=10
+)   
+    nb_features = length(raw_data.features)
+    reduced_ba = zeros(nb_runs, nb_features)
+    for r = 1:nb_runs
+        # partition data
+        data = sim_data_collection(θ, raw_data, weigh_classes=false)
 
-    res = permutation_importance(
-        rf, X_test, y_test, n_repeats=100, scoring="balanced_accuracy"
-    )
+        # test/train split
+        X_train, y_train, X_test, y_test = build_Xy(data, raw_data)
+        nb_test = length(y_test)
+    
+        # train
+        rf = RandomForestClassifier()
+        rf.fit(X_train, y_train)
+        
+        # predict on test
+        ŷ_test = rf.predict(X_test)
+        score = balanced_accuracy_score(y_test, ŷ_test) # baseline
+
+        for f = 1:nb_features
+            # shuffle this feature, for both solutions.
+            X_test_permuted = deepcopy(X_test)
+            X_f_soln_i = shuffle([X_test[i][f              ] for i = 1:nb_test])
+            X_f_soln_j = shuffle([X_test[i][f + nb_features] for i = 1:nb_test])
+            for i = 1:nb_test
+                X_test_permuted[i][f              ] = X_f_soln_i[i]
+                X_test_permuted[i][f + nb_features] = X_f_soln_j[i]
+            end
+
+            # make predictions on test with this feature permuted for both solutions
+            ŷ_test = rf.predict(X_test_permuted)
+            # store reduction in ba
+            reduced_ba[r, f] = score - balanced_accuracy_score(y_test, ŷ_test)
+        end
+    end
     
     # features replicated twice to handle permutation invariance
-    nb_features = length(raw_data.features)
-    mean_importance = (res["importances_mean"][1:nb_features] + res["importances_mean"][nb_features+1:end]) / 2
-    std_importance = sqrt.((res["importances_std"][1:nb_features] .^ 2 + res["importances_std"][nb_features+1:end] .^ 2) / 2)
-    return mean_importance, std_importance
+    return mean(reduced_ba, dims=1)[:], std(reduced_ba, dims=1)[:]
 end
 
 function test_perf_baseline_model(
