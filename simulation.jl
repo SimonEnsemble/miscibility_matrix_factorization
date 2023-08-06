@@ -176,6 +176,9 @@ begin
 	hyperparams_cv = gen_hyperparams(nb_hyperparams, true) # 2nd arg is graph reg
 end
 
+# ╔═╡ 70a722a3-b0b5-4e96-b371-345ddb12665d
+viz_hyperparams(hyperparams_cv)
+
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
 begin
 	nfolds = 3
@@ -221,6 +224,15 @@ viz_latent_space_3d(model, raw_data)
 
 # ╔═╡ 7a31f94e-d779-4e67-8333-0346c9445ed4
 viz_C(model, raw_data, true)
+
+# ╔═╡ 137a96cd-d5d8-40b7-bbb0-ab3db6521e14
+md"viz the imputed matrix"
+
+# ╔═╡ 91229965-9831-4f9f-9052-a2c8d774c58d
+begin
+	M_predicted = pred_M(model) .> model.cutoff
+	viz_miscibility_matrix(M_predicted, raw_data, savename="miscibility_matrix_imputed")
+end
 
 # ╔═╡ 1069ec41-4733-4111-becd-043a104d1c35
 md"
@@ -442,62 +454,22 @@ md"# conceptualize our ML procedures
 viz cross-validation split
 "
 
-# ╔═╡ 7479de96-e20a-4f6b-a75b-71bb4a6126e9
-function viz_procedure(data, raw_data)
-	if ! isdir("viz_procedure")
-		mkdir("viz_procedure")
-	end
-	
-	# viz training data
-	viz_miscibility_matrix(data.M, raw_data, 
-		draw_brackets=false, show_solute_labels=false,
-		savename="viz_procedure/M_train.pdf", include_legend=false)
+# ╔═╡ 317b8e4f-1ad8-47f9-81f2-0271f8e704c7
+viz_ml_procedure(data, raw_data, model)
 
-	# build test data
-	M_test = deepcopy(data.M)
-	fill!(M_test, missing)
-	for (i, j) in data.ids_missing
-		M_test[i, j] = M_test[j, i] = raw_data.M_complete[i, j]
-	end
-	viz_miscibility_matrix(M_test, raw_data, 
-		draw_brackets=false, show_solute_labels=false,
-		savename="viz_procedure/M_test.pdf", include_legend=false)
-
-	# 3-folds cross-validation split
-	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
-							1:length(data.ids_obs),
-							[data.M[i, j] for (i, j) in data.ids_obs])
-
-	for (id_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
-		# get the list of matrix entries, vector of tuples
-		cv_train_entries = data.ids_obs[ids_cv_train]
-		cv_test_entries  = data.ids_obs[ids_cv_test]
-	
-		###
-		# create copy of data
-		# introduce additional missing values, where the cv-test data are.
-		M_train = deepcopy(data.M)
-		for (i, j) in cv_test_entries
-			# ablate entries
-			M_train[i, j] = missing
-			M_train[j, i] = missing
-		end
-		M_test = deepcopy(data.M)
-		for (i, j) in cv_train_entries
-			M_test[i, j] = missing
-			M_test[j, i] = missing
-		end
-		viz_miscibility_matrix(M_test, raw_data, draw_brackets=false, show_solute_labels=false,
-			savename="viz_procedure/M_fold_$(id_fold)_cv_test.pdf",
-			include_legend=false)
-		viz_miscibility_matrix(M_train, raw_data, draw_brackets=false, show_solute_labels=false,
-			savename="viz_procedure/M_fold_$(id_fold)_cv_train.pdf", 
-			include_legend=false)
-	end
+# ╔═╡ 73a13002-3c86-4565-982c-5de7226676d2
+function dude(x; z=3, y=4)
+	println(z)
 end
 
-# ╔═╡ 317b8e4f-1ad8-47f9-81f2-0271f8e704c7
-viz_procedure(data, raw_data)
+# ╔═╡ aaab9ad1-43dd-4cd5-aa04-0212bed0ac0c
+mykwargs = (z=10, y=10)
+
+# ╔═╡ 3e25168f-35d1-423d-bc4f-850deaf14b1d
+dude(2.0; mykwargs...)
+
+# ╔═╡ dcc29ae7-e06e-44db-8d26-c76b0831050a
+
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -543,6 +515,7 @@ viz_procedure(data, raw_data)
 # ╠═abbb1485-8652-4cc5-b749-ab93db6b64fc
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
+# ╠═70a722a3-b0b5-4e96-b371-345ddb12665d
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
 # ╠═65af0efe-5c23-4bc8-898a-ef7a5b43e479
 # ╠═b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
@@ -557,6 +530,8 @@ viz_procedure(data, raw_data)
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
 # ╠═b38dcbae-6895-466d-bc49-7a6865326469
 # ╠═7a31f94e-d779-4e67-8333-0346c9445ed4
+# ╟─137a96cd-d5d8-40b7-bbb0-ab3db6521e14
+# ╠═91229965-9831-4f9f-9052-a2c8d774c58d
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
 # ╟─6500c702-835b-4fd3-a54a-ad35e11c4111
 # ╠═cf67313d-8b14-40e1-abfd-ab559450e098
@@ -598,5 +573,8 @@ viz_procedure(data, raw_data)
 # ╠═c09d65a7-3457-4a5a-8521-d01513797dd2
 # ╠═f37c6347-17fe-4166-bcad-3f5951c70dcb
 # ╟─8f5043d8-0a44-4619-8659-2444acaae5d0
-# ╠═7479de96-e20a-4f6b-a75b-71bb4a6126e9
 # ╠═317b8e4f-1ad8-47f9-81f2-0271f8e704c7
+# ╠═73a13002-3c86-4565-982c-5de7226676d2
+# ╠═aaab9ad1-43dd-4cd5-aa04-0212bed0ac0c
+# ╠═3e25168f-35d1-423d-bc4f-850deaf14b1d
+# ╠═dcc29ae7-e06e-44db-8d26-c76b0831050a

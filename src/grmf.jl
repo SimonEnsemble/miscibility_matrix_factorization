@@ -14,6 +14,13 @@ function pred_mᵢⱼ(model::MFModel, i::Int, j::Int)
     return logistic(dot(cᵢ, cⱼ) + model.b)
 end
 
+function pred_M(model::MFModel)
+    M̃ = logistic.(model.C' * model.C .+ model.b)
+    # some tests
+    @assert M̃[3, 2] ≈ pred_mᵢⱼ(model, 3, 2)
+    return M̃
+end
+
 function loss(data::MiscibilityData, model::MFModel, K::Matrix{Float64})
     # code below assumes M all 0's or 1's
     @assert all(skipmissing(data.M) .== 1 .|| skipmissing(data.M) .== 0)

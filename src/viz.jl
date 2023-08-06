@@ -42,15 +42,20 @@ function viz_miscibility_matrix(M, raw_data::RawData;
         draw_brackets::Bool=false, 
         include_legend::Bool=true, 
         savename::Union{String, Nothing}=nothing,
-        show_solute_labels::Bool=true
+        show_solute_labels::Bool=true,
+        show_xy_labels::Bool=true,
+        huge_font::Bool=false
 )
     big_fontsize = 50
+    if huge_font
+        big_fontsize *= 2.5
+    end
     
     the_compound_labels = pretty_compound_labels(raw_data)
 
     fig = Figure(resolution=(1450, 1450))
     ax  = Axis(fig[1, 1], 
-        xlabel=show_solute_labels ? "solution" : "", ylabel=show_solute_labels ? "solution" : "", 
+        xlabel=show_xy_labels ? "solution" : "", ylabel=show_xy_labels ? "solution" : "", 
         xgridvisible=false, 
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
@@ -396,4 +401,75 @@ function viz_rf_feature_importance(
     Label(fig[1, 1], "θ = $(round(θ, digits=1))", tellwidth=false, tellheight=false, valign=0.9, halign=0.9)
     save("rf_feature_importance.pdf", fig)
 	fig
+end
+
+function viz_ml_procedure(data::MiscibilityData, raw_data::RawData, model::MFModel; nfolds::Int=3)
+	if ! isdir("viz_procedure")
+		mkdir("viz_procedure")
+	end
+
+    # viz complete matrix
+    viz_miscibility_matrix(raw_data.M_complete, raw_data, 
+		draw_brackets=false, show_solute_labels=false,
+		savename="viz_procedure/M_complete.pdf", include_legend=true, huge_font=true)
+
+    viz_kwargs = (draw_brackets=false, show_solute_labels=false, show_xy_labels=false, include_legend=false)
+	# viz training data
+    viz_miscibility_matrix(data.M, raw_data; viz_kwargs..., savename="viz_procedure/M_train.pdf")
+
+	# build test data
+	M_test = deepcopy(data.M)
+	fill!(M_test, missing)
+	for (i, j) in data.ids_missing
+		M_test[i, j] = M_test[j, i] = raw_data.M_complete[i, j]
+	end
+	viz_miscibility_matrix(M_test, raw_data; viz_kwargs..., savename="viz_procedure/M_test.pdf")
+
+	# 3-folds cross-validation split
+	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
+							1:length(data.ids_obs),
+							[data.M[i, j] for (i, j) in data.ids_obs])
+
+	for (id_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
+		# get the list of matrix entries, vector of tuples
+		cv_train_entries = data.ids_obs[ids_cv_train]
+		cv_test_entries  = data.ids_obs[ids_cv_test]
+
+		###
+		# create copy of data
+		# introduce additional missing values, where the cv-test data are.
+		M_train = deepcopy(data.M)
+		for (i, j) in cv_test_entries
+			# ablate entries
+			M_train[i, j] = missing
+			M_train[j, i] = missing
+		end
+		M_test = deepcopy(data.M)
+		for (i, j) in cv_train_entries
+			M_test[i, j] = missing
+			M_test[j, i] = missing
+		end
+		viz_miscibility_matrix(M_test, raw_data; viz_kwargs...,
+			savename="viz_procedure/M_fold_$(id_fold)_cv_test.pdf"
+           )
+		viz_miscibility_matrix(M_train, raw_data;  viz_kwargs...,
+            savename="viz_procedure/M_fold_$(id_fold)_cv_train.pdf"
+           )
+	end
+    # the imputed matrix, too.
+    M_predicted = pred_M(model) .> model.cutoff
+    viz_miscibility_matrix(M_predicted, raw_data; savename="viz_procedure/M_imputed.pdf", viz_kwargs...)
+    return "see viz_procedure/ for images"
+end
+
+function viz_hyperparams(hps)
+    fig = Figure()
+    ax = Axis3(fig[1, 1], xlabel="k", ylabel="λ", zlabel="γ", xticks=[2, 3], title="hyperparameter space")
+	scatter!(
+		[hp[:k] for hp in hps],
+		[hp[:λ] for hp in hps],
+		[hp[:γ] for hp in hps]
+	)
+    save("hp_space.png", fig)
+	return fig
 end

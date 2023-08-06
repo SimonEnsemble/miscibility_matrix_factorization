@@ -26,11 +26,12 @@ include.(
 export build_miscibility_matrix, build_compound_info, retreive_raw_data, RawData, # data_prep.jl
        sim_data_collection, MiscibilityData, # introduce_missing_entries.jl
        class_similarity_matrix, kernel_matrix, # kernel_matrix.jl
-       construct_train_model, MFModel, AdamOptInfo, pred_mᵢⱼ, # grmf.jl
+       construct_train_model, MFModel, AdamOptInfo, pred_mᵢⱼ, pred_M, # grmf.jl
        compute_perf_metrics, # perf.jl
        do_hyperparam_optimization, # hyperparam_opt.jl
        set_opt_cutoff!, # set_cutoff.jl
-       viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, class_to_color, viz_category_miscibility, viz_C, viz_latent_space_3d, viz_imputations, viz_rf_feature_importance, # viz.jl
+       viz_miscibility_matrix, viz_loss, viz_latent_space, viz_confusion, class_to_color, viz_category_miscibility, # viz.jl
+       viz_C, viz_latent_space_3d, viz_imputations, viz_rf_feature_importance, viz_ml_procedure, viz_hyperparams, # still viz.jl
        build_Xy, test_perf_baseline_model, test_perf_guessing, rf_feature_importance, # baseline.jl
        gen_hyperparams, run_experiment, run_experiments # run_expt.jl
 end
