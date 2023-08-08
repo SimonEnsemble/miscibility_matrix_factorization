@@ -176,9 +176,6 @@ begin
 	hyperparams_cv = gen_hyperparams(nb_hyperparams, true) # 2nd arg is graph reg
 end
 
-# ╔═╡ 70a722a3-b0b5-4e96-b371-345ddb12665d
-viz_hyperparams(hyperparams_cv)
-
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
 begin
 	nfolds = 3
@@ -188,6 +185,9 @@ end
 
 # ╔═╡ 65af0efe-5c23-4bc8-898a-ef7a5b43e479
 opt_hyperparams
+
+# ╔═╡ 70a722a3-b0b5-4e96-b371-345ddb12665d
+viz_hyperparams(hyperparams_cv, opt_hyperparams)
 
 # ╔═╡ b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 mean(perf_metrics[:, opt_hps_id]) # best cross-validation perf
@@ -223,7 +223,7 @@ viz_latent_space(model, raw_data, save_fig=true)
 viz_latent_space_3d(model, raw_data)
 
 # ╔═╡ 7a31f94e-d779-4e67-8333-0346c9445ed4
-viz_C(model, raw_data, true)
+viz_C(model, raw_data, savename="C.pdf")
 
 # ╔═╡ 137a96cd-d5d8-40b7-bbb0-ab3db6521e14
 md"viz the imputed matrix"
@@ -457,20 +457,6 @@ viz cross-validation split
 # ╔═╡ 317b8e4f-1ad8-47f9-81f2-0271f8e704c7
 viz_ml_procedure(data, raw_data, model)
 
-# ╔═╡ 73a13002-3c86-4565-982c-5de7226676d2
-function dude(x; z=3, y=4)
-	println(z)
-end
-
-# ╔═╡ aaab9ad1-43dd-4cd5-aa04-0212bed0ac0c
-mykwargs = (z=10, y=10)
-
-# ╔═╡ 3e25168f-35d1-423d-bc4f-850deaf14b1d
-dude(2.0; mykwargs...)
-
-# ╔═╡ dcc29ae7-e06e-44db-8d26-c76b0831050a
-
-
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
 # ╠═006c7e92-e8a5-471e-92be-4d27134295f4
@@ -515,9 +501,9 @@ dude(2.0; mykwargs...)
 # ╠═abbb1485-8652-4cc5-b749-ab93db6b64fc
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
 # ╠═024ce284-90f3-43e6-b701-1f13d209462f
-# ╠═70a722a3-b0b5-4e96-b371-345ddb12665d
 # ╠═4c53ea02-bd91-44a7-9a32-d4759021b7f8
 # ╠═65af0efe-5c23-4bc8-898a-ef7a5b43e479
+# ╠═70a722a3-b0b5-4e96-b371-345ddb12665d
 # ╠═b8d7ddb6-aa97-4660-a391-3b7b6ffa59f9
 # ╠═09165856-9117-47e4-8560-fc3f457ad6df
 # ╟─925791d7-3dee-4d6b-9baa-9ee85afb487c
@@ -574,7 +560,3 @@ dude(2.0; mykwargs...)
 # ╠═f37c6347-17fe-4166-bcad-3f5951c70dcb
 # ╟─8f5043d8-0a44-4619-8659-2444acaae5d0
 # ╠═317b8e4f-1ad8-47f9-81f2-0271f8e704c7
-# ╠═73a13002-3c86-4565-982c-5de7226676d2
-# ╠═aaab9ad1-43dd-4cd5-aa04-0212bed0ac0c
-# ╠═3e25168f-35d1-423d-bc4f-850deaf14b1d
-# ╠═dcc29ae7-e06e-44db-8d26-c76b0831050a

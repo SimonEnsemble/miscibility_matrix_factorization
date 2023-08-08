@@ -14,7 +14,7 @@ label_to_string = Dict(0 => "immiscible", 1 => "miscible")
 
 function viz_imputations(model::MFModel, data::MiscibilityData, raw_data::RawData)
     m     = [raw_data.M_complete[i, j] for (i, j) in data.ids_missing]
-	m̂_raw = [pred_mᵢⱼ(model, i, j)     for (i, j) in data.ids_missing]
+    m̂_raw = [pred_mᵢⱼ(model, i, j)     for (i, j) in data.ids_missing]
 
     fig = Figure()
     ax = Axis(fig[1, 1], xlabel="σ(cᵢ ⋅ cⱼ + b)", ylabel="# pairs of solutions")
@@ -27,7 +27,7 @@ function viz_imputations(model::MFModel, data::MiscibilityData, raw_data::RawDat
     ylims!(0, nothing)
     xlims!(0, 1)
     save("viz_imputations.pdf", fig)
-	return fig
+    return fig
 end
 
 function pretty_compound_labels(raw_data::RawData)
@@ -48,7 +48,7 @@ function viz_miscibility_matrix(M, raw_data::RawData;
 )
     big_fontsize = 50
     if huge_font
-        big_fontsize *= 2.5
+        big_fontsize *= 1.75
     end
     
     the_compound_labels = pretty_compound_labels(raw_data)
@@ -134,7 +134,13 @@ function viz_miscibility_matrix(M, raw_data::RawData;
     return fig
 end
 
-function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
+function viz_C(
+        model::MFModel, 
+        raw_data::RawData; 
+        draw_brackets::Bool=true, 
+        savename::Union{String, Nothing}=nothing,
+        minimal_viz::Bool=false
+)
     big_fontsize = 50
 
     the_compound_labels = pretty_compound_labels(raw_data)
@@ -142,7 +148,8 @@ function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
 
     fig = Figure(resolution=(1450, 1450))#(size(model.C)[1] * 1450 / raw_data.n_compounds, 1450))
     ax  = Axis(fig[1, 1],
-        xlabel="solution", ylabel="latent\ndim.",
+        xlabel="solution",
+        ylabel="latent\ndim.",
         xgridvisible=false,
         xlabelsize=big_fontsize,
         ylabelsize=big_fontsize,
@@ -182,14 +189,21 @@ function viz_C(model::MFModel, raw_data::RawData, draw_brackets::Bool=true)
     end
     #colsize!(fig.layout, 1, Aspect(1, 1.0))
     rowsize!(fig.layout, 1, Fixed(pixelarea(ax.scene)[].widths[2]))
-    Colorbar(fig[:, end+1], hm, label="Cᵢⱼ")
+    if ! minimal_viz
+        Colorbar(fig[:, end+1], hm, label="Cᵢⱼ")
+    end
     # this messes up the brackets
     if draw_brackets
        notify(t_ax.finallimits)
        notify(ax.finallimits)
     end
+    if minimal_viz
+        hidedecorations!(ax)
+    end
     resize_to_layout!(fig)
-    save("C.pdf", fig)
+    if ! isnothing(savename)
+        save(savename, fig)
+    end
     return fig
 end
 
@@ -211,35 +225,35 @@ function viz_latent_space_3d(model::MFModel, raw_data::RawData; append_filename:
     end
 
     fig = Figure()
-	ax = Axis3(fig[1, 1],
-		xlabel="latent dim. 1",
-		ylabel="latent dim. 2",
-		zlabel="latent dim. 3",
-		xgridvisible=true,
-		ygridvisible=true,
-		zgridvisible=true,
-		aspect=:data
-	)
+    ax = Axis3(fig[1, 1],
+        xlabel="latent dim. 1",
+        ylabel="latent dim. 2",
+        zlabel="latent dim. 3",
+        xgridvisible=true,
+        ygridvisible=true,
+        zgridvisible=true,
+        aspect=:data
+    )
     # draw axes
     lines!([-5, 5], [0, 0], [0, 0], color="black", linewidth=1)
     lines!([0, 0], [-5, 5], [0, 0], color="black", linewidth=1)
     lines!([0, 0], [0, 0], [-5, 5], color="black", linewidth=1)
-	classes = unique(raw_data.classes)
-	sps = []
-	for c in classes
-		push!(sps,
-			scatter!(model.C[:, raw_data.classes .== c],
-				color=class_to_color[c], label=c)
-		)
-	end
+    classes = unique(raw_data.classes)
+    sps = []
+    for c in classes
+        push!(sps,
+            scatter!(model.C[:, raw_data.classes .== c],
+                color=class_to_color[c], label=c)
+        )
+    end
     the_lims = 1.1 * maximum(abs.(model.C))
     xlims!(-the_lims, the_lims)
     ylims!(-the_lims, the_lims)
     zlims!(-the_lims, the_lims)
-	Legend(fig[1, 2], sps, lowercase.(classes), orientation=:vertical)
-	#resize_to_layout!(fig)
-	save("3d_latent_space" * append_filename * ".pdf", fig)
-	return fig
+    Legend(fig[1, 2], sps, lowercase.(classes), orientation=:vertical)
+    #resize_to_layout!(fig)
+    save("3d_latent_space" * append_filename * ".pdf", fig)
+    return fig
 end
 
 function viz_latent_space(model::MFModel, raw_data::RawData; incl_legend::Bool=true, save_fig::Bool=false, append_filename::String="")
@@ -388,88 +402,98 @@ function viz_rf_feature_importance(
     μ_importance, σ_importance = rf_feature_importance(raw_data, θ, nb_runs)
 
     fig = Figure()
-	ax  = Axis(fig[1, 1],
-		xlabel="solution feature", ylabel="decrease of\nbalanced accuracy",
-		xticks=(1:length(raw_data.features), raw_data.features),
-		xticklabelrotation=π/2,
+    ax  = Axis(fig[1, 1],
+        xlabel="solution feature", ylabel="decrease of\nbalanced accuracy",
+        xticks=(1:length(raw_data.features), raw_data.features),
+        xticklabelrotation=π/2,
         title="permutation-based feature importance"
-	)
+    )
     bar_colors = map(i -> i > 0 ? "green" : "red", μ_importance)
-	barplot!(1:length(raw_data.features), μ_importance, color=bar_colors)
-	errorbars!(1:length(raw_data.features), μ_importance,
-		σ_importance, whiskerwidth=10)
+    barplot!(1:length(raw_data.features), μ_importance, color=bar_colors)
+    errorbars!(1:length(raw_data.features), μ_importance,
+        σ_importance, whiskerwidth=10)
     Label(fig[1, 1], "θ = $(round(θ, digits=1))", tellwidth=false, tellheight=false, valign=0.9, halign=0.9)
     save("rf_feature_importance.pdf", fig)
-	fig
+    fig
 end
 
 function viz_ml_procedure(data::MiscibilityData, raw_data::RawData, model::MFModel; nfolds::Int=3)
-	if ! isdir("viz_procedure")
-		mkdir("viz_procedure")
-	end
+    if ! isdir("viz_procedure")
+        mkdir("viz_procedure")
+    end
+    
+    viz_C(model, raw_data, savename="viz_procedure/C.pdf", draw_brackets=false, minimal_viz=true)
 
     # viz complete matrix
     viz_miscibility_matrix(raw_data.M_complete, raw_data, 
-		draw_brackets=false, show_solute_labels=false,
-		savename="viz_procedure/M_complete.pdf", include_legend=true, huge_font=true)
+        draw_brackets=false, show_solute_labels=false,
+        savename="viz_procedure/M_complete.pdf", include_legend=true, huge_font=true)
 
-    viz_kwargs = (draw_brackets=false, show_solute_labels=false, show_xy_labels=false, include_legend=false)
-	# viz training data
+    viz_kwargs = (draw_brackets=false, show_solute_labels=false, show_xy_labels=false, include_legend=false, huge_font=true)
+    # viz training data
     viz_miscibility_matrix(data.M, raw_data; viz_kwargs..., savename="viz_procedure/M_train.pdf")
+    viz_miscibility_matrix(data.M, raw_data; viz_kwargs..., savename="viz_procedure/M_train_w_label.pdf", show_xy_labels=true, include_legend=true)
 
-	# build test data
-	M_test = deepcopy(data.M)
-	fill!(M_test, missing)
-	for (i, j) in data.ids_missing
-		M_test[i, j] = M_test[j, i] = raw_data.M_complete[i, j]
-	end
-	viz_miscibility_matrix(M_test, raw_data; viz_kwargs..., savename="viz_procedure/M_test.pdf")
+    # build test data
+    M_test = deepcopy(data.M)
+    fill!(M_test, missing)
+    for (i, j) in data.ids_missing
+        M_test[i, j] = M_test[j, i] = raw_data.M_complete[i, j]
+    end
+    viz_miscibility_matrix(M_test, raw_data; viz_kwargs..., savename="viz_procedure/M_test.pdf", show_xy_labels=true)
 
-	# 3-folds cross-validation split
-	kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
-							1:length(data.ids_obs),
-							[data.M[i, j] for (i, j) in data.ids_obs])
+    # 3-folds cross-validation split
+    kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true),
+                            1:length(data.ids_obs),
+                            [data.M[i, j] for (i, j) in data.ids_obs])
 
-	for (id_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
-		# get the list of matrix entries, vector of tuples
-		cv_train_entries = data.ids_obs[ids_cv_train]
-		cv_test_entries  = data.ids_obs[ids_cv_test]
+    for (id_fold, (ids_cv_train, ids_cv_test)) in enumerate(kf_split)
+        # get the list of matrix entries, vector of tuples
+        cv_train_entries = data.ids_obs[ids_cv_train]
+        cv_test_entries  = data.ids_obs[ids_cv_test]
 
-		###
-		# create copy of data
-		# introduce additional missing values, where the cv-test data are.
-		M_train = deepcopy(data.M)
-		for (i, j) in cv_test_entries
-			# ablate entries
-			M_train[i, j] = missing
-			M_train[j, i] = missing
-		end
-		M_test = deepcopy(data.M)
-		for (i, j) in cv_train_entries
-			M_test[i, j] = missing
-			M_test[j, i] = missing
-		end
-		viz_miscibility_matrix(M_test, raw_data; viz_kwargs...,
-			savename="viz_procedure/M_fold_$(id_fold)_cv_test.pdf"
+        ###
+        # create copy of data
+        # introduce additional missing values, where the cv-test data are.
+        M_train = deepcopy(data.M)
+        for (i, j) in cv_test_entries
+            # ablate entries
+            M_train[i, j] = missing
+            M_train[j, i] = missing
+        end
+        M_test = deepcopy(data.M)
+        for (i, j) in cv_train_entries
+            M_test[i, j] = missing
+            M_test[j, i] = missing
+        end
+        for i = 1:raw_data.n_compounds
+            M_test[i, i] = missing
+        end
+        viz_miscibility_matrix(M_test, raw_data; viz_kwargs...,
+            savename="viz_procedure/M_fold_$(id_fold)_cv_test.pdf"
            )
-		viz_miscibility_matrix(M_train, raw_data;  viz_kwargs...,
+        viz_miscibility_matrix(M_train, raw_data;  viz_kwargs...,
             savename="viz_procedure/M_fold_$(id_fold)_cv_train.pdf"
            )
-	end
+    end
     # the imputed matrix, too.
     M_predicted = pred_M(model) .> model.cutoff
     viz_miscibility_matrix(M_predicted, raw_data; savename="viz_procedure/M_imputed.pdf", viz_kwargs...)
     return "see viz_procedure/ for images"
 end
 
-function viz_hyperparams(hps)
+function viz_hyperparams(hps, opt_hps)
     fig = Figure()
-    ax = Axis3(fig[1, 1], xlabel="k", ylabel="λ", zlabel="γ", xticks=[2, 3], title="hyperparameter space")
-	scatter!(
-		[hp[:k] for hp in hps],
-		[hp[:λ] for hp in hps],
-		[hp[:γ] for hp in hps]
-	)
-    save("hp_space.png", fig)
-	return fig
+    ax = Axis3(fig[1, 1], 
+               xlabel="k", ylabel="λ", zlabel="γ", 
+               xticks=[2, 3], yticks=[0.2, 1.0], zticks=[0, 0.1],
+               title="hyperparameter space")
+    scatter!(
+            [hp[:k] for hp in hps],
+            [hp[:λ] for hp in hps],
+            [hp[:γ] for hp in hps]
+    )
+    scatter!([opt_hps[:k]], [opt_hps[:λ]], [opt_hps[:γ]], markersize=15)
+    save("hp_space.png", fig,  px_per_unit=2)
+    return fig
 end
