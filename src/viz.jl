@@ -87,13 +87,15 @@ function viz_miscibility_matrix(M, raw_data::RawData;
             l = sum(raw_data.classes .== c) # number of instances of this class
 
             # draw brackets on top
-            bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8, 
-                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+            bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8,
+                     linewidth=huge_font ? 8 : 5,
+                     font=AlgebraOfGraphics.firasans("Light"), text=huge_font ? "" : lowercase(c), color=class_to_color[c])
 
             # draw brackets on right
             bracket!(r_ax, 0, raw_data.n_compounds + 1 - (c0 + l) + 0.5, 0, raw_data.n_compounds + 1 - c0 - 0.5, 
-                     orientation=:down, fontsize=big_fontsize/1.8, 
-                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+                     orientation=:down, fontsize=big_fontsize/1.8,
+                     linewidth=huge_font ? 8 : 5,
+                     font=AlgebraOfGraphics.firasans("Light"), text=huge_font ? "" : lowercase(c), color=class_to_color[c])
             
             c0 += l
         end
@@ -179,7 +181,8 @@ function viz_C(
 
             # draw brackets on top
             bracket!(t_ax, c0 + 0.5, 0, c0 + l - 0.5, 0, orientation=:up, fontsize=big_fontsize/1.8, 
-                     font=AlgebraOfGraphics.firasans("Light"), text=lowercase(c), color=class_to_color[c])
+                     linewidth=minimal_viz ? 8 : 5,
+                     font=AlgebraOfGraphics.firasans("Light"), text=minimal_viz ? "" : lowercase(c), color=class_to_color[c])
 
             c0 += l
         end
@@ -193,14 +196,14 @@ function viz_C(
         Colorbar(fig[:, end+1], hm, label="Cᵢⱼ")
     end
     # this messes up the brackets
-    if draw_brackets
-       notify(t_ax.finallimits)
-       notify(ax.finallimits)
-    end
     if minimal_viz
         hidedecorations!(ax)
     end
     resize_to_layout!(fig)
+    if draw_brackets
+       notify(t_ax.finallimits)
+       notify(ax.finallimits)
+    end
     if ! isnothing(savename)
         save(savename, fig)
     end
@@ -210,7 +213,7 @@ end
 _viz_loss!(ax, losses::Vector{Float64}) = lines!(ax, 1:length(losses), losses)
 
 function viz_loss(losses::Vector{Float64}; save_fig::Bool=false, append_filename::String="")
-    fig = Figure()
+    fig = Figure(backgroundcolor=("white", 1.0))
     ax = Axis(fig[1, 1], xlabel="# epochs", ylabel="loss")
     _viz_loss!(ax, losses)
     if save_fig
@@ -423,10 +426,13 @@ function viz_ml_procedure(data::MiscibilityData, raw_data::RawData, model::MFMod
     end
     
     viz_C(model, raw_data, savename="viz_procedure/C.pdf", draw_brackets=false, minimal_viz=true)
+    hack_model = deepcopy(model)
+    fill!(hack_model.C, hack_model.b)
+    viz_C(hack_model, raw_data, savename="viz_procedure/b.pdf", draw_brackets=false, minimal_viz=true)
 
     # viz complete matrix
     viz_miscibility_matrix(raw_data.M_complete, raw_data, 
-        draw_brackets=false, show_solute_labels=false,
+        draw_brackets=true, show_solute_labels=false,
         savename="viz_procedure/M_complete.pdf", include_legend=true, huge_font=true)
 
     viz_kwargs = (draw_brackets=false, show_solute_labels=false, show_xy_labels=false, include_legend=false, huge_font=true)

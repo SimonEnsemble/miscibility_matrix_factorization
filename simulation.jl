@@ -151,6 +151,9 @@ viz_miscibility_matrix(data.M, raw_data, draw_brackets=true, savename="miscibili
 # ╔═╡ 86e8f156-dd43-496c-b040-b4772fe0c536
 raw_data.classes
 
+# ╔═╡ d3c890fd-b7b5-4dad-b937-8d98f5278114
+viz_miscibility_matrix(data.M, raw_data, draw_brackets=true, savename="miscibility_matrix_simple.pdf", show_solute_labels=false, huge_font=true)
+
 # ╔═╡ d2913b8d-ccef-4790-aa69-56106767f592
 md"# dev model
 
@@ -225,13 +228,20 @@ viz_latent_space_3d(model, raw_data)
 # ╔═╡ 7a31f94e-d779-4e67-8333-0346c9445ed4
 viz_C(model, raw_data, savename="C.pdf")
 
+# ╔═╡ 00f52f67-8afe-4814-92b0-f08f1544bed7
+viz_C(model, raw_data, savename="C_simple.pdf", minimal_viz=true, draw_brackets=false)
+
 # ╔═╡ 137a96cd-d5d8-40b7-bbb0-ab3db6521e14
 md"viz the imputed matrix"
 
 # ╔═╡ 91229965-9831-4f9f-9052-a2c8d774c58d
 begin
 	M_predicted = pred_M(model) .> model.cutoff
-	viz_miscibility_matrix(M_predicted, raw_data, savename="miscibility_matrix_imputed")
+	viz_miscibility_matrix(M_predicted, raw_data, 
+			savename="miscibility_matrix_imputed_simple", show_solute_labels=false)
+	
+	viz_miscibility_matrix(M_predicted, raw_data, 
+			savename="miscibility_matrix_imputed")
 end
 
 # ╔═╡ 1069ec41-4733-4111-becd-043a104d1c35
@@ -326,6 +336,16 @@ md"## RF feature importance"
 # ╔═╡ da34e60e-b628-4af6-9d1d-1a64a50119d3
 viz_rf_feature_importance(raw_data, θ, 25)
 
+# ╔═╡ 4ab546f3-6596-40c3-a4ba-051e97649dd7
+md"## timing"
+
+# ╔═╡ 154429da-6316-4683-99ab-ded882f84e06
+@time construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true)
+
+# ╔═╡ 74bb7d26-993a-4047-9546-9933a64bc1af
+@time do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
+		nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true, nfolds=nfolds)
+
 # ╔═╡ 2a85c371-731f-4110-b50a-3d196184f8bb
 md"# multiple runs and sparsities"
 
@@ -376,9 +396,6 @@ if do_multiple_runs
 		p |> Gadfly.PDF("results_$(θ)_$(nruns)_runs.pdf")
 	end
 end
-
-# ╔═╡ cb4d2a81-1c16-46ca-9f40-a8f3d298bdd4
-
 
 # ╔═╡ cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 function balanced_acc_boxplot(θs, θ_to_perf)
@@ -455,7 +472,7 @@ viz cross-validation split
 "
 
 # ╔═╡ 317b8e4f-1ad8-47f9-81f2-0271f8e704c7
-viz_ml_procedure(data, raw_data, model)
+viz_ml_procedure(data, raw_data, model) # for presentations etc.
 
 # ╔═╡ Cell order:
 # ╠═4305ab70-e080-11ed-1f7c-1b8fb559b6c3
@@ -497,6 +514,7 @@ viz_ml_procedure(data, raw_data, model)
 # ╠═436164ee-01b8-46ad-9e96-5e72368444d4
 # ╠═8d1b193b-a66c-4f37-80ae-7083f93ceb78
 # ╠═86e8f156-dd43-496c-b040-b4772fe0c536
+# ╠═d3c890fd-b7b5-4dad-b937-8d98f5278114
 # ╟─d2913b8d-ccef-4790-aa69-56106767f592
 # ╠═abbb1485-8652-4cc5-b749-ab93db6b64fc
 # ╟─ff07a8bf-4fe4-46ca-a929-d64b557903d6
@@ -516,6 +534,7 @@ viz_ml_procedure(data, raw_data, model)
 # ╠═143582f4-83dc-4f38-befb-eb0109c37b7f
 # ╠═b38dcbae-6895-466d-bc49-7a6865326469
 # ╠═7a31f94e-d779-4e67-8333-0346c9445ed4
+# ╠═00f52f67-8afe-4814-92b0-f08f1544bed7
 # ╟─137a96cd-d5d8-40b7-bbb0-ab3db6521e14
 # ╠═91229965-9831-4f9f-9052-a2c8d774c58d
 # ╟─1069ec41-4733-4111-becd-043a104d1c35
@@ -543,6 +562,9 @@ viz_ml_procedure(data, raw_data, model)
 # ╠═621c8c22-e093-4d55-8e80-1d8b81646e69
 # ╟─73e89a22-fded-47f6-a821-847b1ec13f9c
 # ╠═da34e60e-b628-4af6-9d1d-1a64a50119d3
+# ╟─4ab546f3-6596-40c3-a4ba-051e97649dd7
+# ╠═154429da-6316-4683-99ab-ded882f84e06
+# ╠═74bb7d26-993a-4047-9546-9933a64bc1af
 # ╟─2a85c371-731f-4110-b50a-3d196184f8bb
 # ╠═05bd9cc6-ce9e-4dec-8c82-d7c62d4d0b6f
 # ╠═e8221855-745c-4eb1-8320-d785b89c284f
@@ -551,7 +573,6 @@ viz_ml_procedure(data, raw_data, model)
 # ╠═29eafcac-3054-44e5-89b0-a93fc981b534
 # ╟─112e75a8-73e0-429f-9afd-5d4636b0e31c
 # ╠═5906e98f-2d7d-4416-abf0-7d64e927bb40
-# ╠═cb4d2a81-1c16-46ca-9f40-a8f3d298bdd4
 # ╠═cddb1b28-e5b2-436a-b4e1-decb2fa2aae0
 # ╠═43beda5f-7bcc-4fb4-8b4e-d995bb4c7985
 # ╠═d9ae5b52-22c1-4559-9084-ec38bf3fb4a7

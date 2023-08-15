@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.20
+# v0.19.27
 
 using Markdown
 using InteractiveUtils
@@ -9,7 +9,7 @@ begin
 	import Pkg; Pkg.activate()
 	push!(LOAD_PATH, "src/")
 
-	using MiscibilityMF, Graphs, GraphMakie, NetworkLayout, CairoMakie, Random, DataFrames, Statistics
+	using MiscibilityMF, Graphs, GraphMakie, NetworkLayout, CairoMakie, Random, DataFrames, Statistics, Colors
 	import Gadfly
 end
 
@@ -56,7 +56,7 @@ begin
 		edge_width=1, 
 		edge_color=("black", 0.5),
 		layout=layout, 
-		nlabels=raw_data.compounds, 
+		# nlabels=raw_data.compounds, 
 		# nlabels_align=nlabels_align,
 		# nlabels_offset=nlabels_offset,
 		node_attr=(; markersize=20, strokewidth=1)
@@ -90,8 +90,8 @@ function graph_to_dataframe()
 		filter(row -> row["class"] == "polymer", df)[:, c] 
 		for c in ["x", "y"]]
 	)
-	shift_center = [-20, 15]
-	α = 7.0
+	shift_center = [-20, 22]
+	α = 8.0
 	for i = 1:nrow(df)
 		if df[i, "class"] == "polymer"
 			# sretch
@@ -121,7 +121,8 @@ begin
 		yends = [df_c[j, "y"] for i = 1:n_c, j = 1:n_c if i < j]
 		
 		push!(edge_plots, 
-			Gadfly.layer(x=xs, y=ys, xend=xends, yend=yends, Gadfly.Geom.segment, Gadfly.Theme(default_color=colorant"lightgray"))
+			Gadfly.layer(x=xs, y=ys, xend=xends, yend=yends, Gadfly.Geom.segment, Gadfly.Theme(default_color=RGBA(0.0, 0.0, 0.0, 0.2))# colorant"lightgray"))
+			)
 		)
 	end
 end
@@ -129,7 +130,7 @@ end
 # ╔═╡ b630bb04-511f-4f80-8268-e71bd1c99f6e
 gp = Gadfly.plot(
 	Gadfly.layer(df, x="x", y="y", label="label", color="class",
-		Gadfly.Geom.point, Gadfly.Geom.label),
+		Gadfly.Geom.point),#, Gadfly.Geom.label),
 	Gadfly.Guide.xlabel(""), Gadfly.Guide.ylabel(""),
 	edge_plots...,
 	Gadfly.Theme(background_color=colorant"white"),
@@ -137,7 +138,7 @@ gp = Gadfly.plot(
 )
 
 # ╔═╡ d6fb82d8-8423-4b59-a2f0-36b389f8ea67
-Gadfly.draw(Gadfly.SVG("graph.svg", 6Gadfly.inch, 6Gadfly.inch), gp)
+Gadfly.draw(Gadfly.SVG("graph.svg", 3Gadfly.inch, 3Gadfly.inch), gp) # change to 6 for main
 
 # ╔═╡ Cell order:
 # ╠═13a8cc80-e06d-11ed-3734-dde2e620fda7
