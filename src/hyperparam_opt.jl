@@ -7,8 +7,12 @@ function do_hyperparam_optimization(
     type_of_perf_metric::Symbol=:balanced_accuracy,
     record_loss::Bool=false,
     α::Float64=0.006,
-    use_adam::Bool=false
+    use_adam::Bool=false,
+    seed::Union{Nothing, Int}=nothing
 )
+    if ! isnothing(seed)
+        Random.seed!(seed)
+    end
     # cross-validation split
     kf_split = train_test_pairs(StratifiedCV(nfolds=nfolds, shuffle=true), 
                             1:length(data.ids_obs), 

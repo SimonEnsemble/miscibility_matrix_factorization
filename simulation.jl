@@ -44,6 +44,9 @@ import Gadfly
 # ╔═╡ 78ea2361-f2b7-4e0b-ad73-f4ddffecdff7
 TableOfContents()
 
+# ╔═╡ f1f1fa73-08b4-4d1d-ad5e-f0903519fb8b
+my_seed = 97330 # to make results reproducible
+
 # ╔═╡ 59986921-6e8c-4d38-ae3c-7e7ba1bc246d
 md"# read in raw data"
 
@@ -131,7 +134,7 @@ md"# introduce missing values"
 θ = 0.4 # fraction missing
 
 # ╔═╡ 3c44a682-8161-4b03-aaf0-4d9b813c99cb
-data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=97330)
+data = sim_data_collection(θ, raw_data, weigh_classes=false, seed=my_seed)
 
 # ╔═╡ 377d754f-c6cb-48c6-8ce4-1fe3335a23a1
 mean([data.M[i, j] for (i, j) in data.ids_obs]) # fraction miscible
@@ -173,17 +176,18 @@ md"## hyper-param search"
 
 # ╔═╡ 024ce284-90f3-43e6-b701-1f13d209462f
 begin
-	Random.seed!(97331)
 	nb_hyperparams = 25
 	
-	hyperparams_cv = gen_hyperparams(nb_hyperparams, true) # 2nd arg is graph reg
+	hyperparams_cv = gen_hyperparams(nb_hyperparams, true, seed=my_seed) # 2nd arg is graph reg
 end
 
 # ╔═╡ 4c53ea02-bd91-44a7-9a32-d4759021b7f8
 begin
 	nfolds = 3
 	perf_metrics, opt_hps_id, opt_hyperparams, fig_losses = do_hyperparam_optimization(data, hyperparams_cv, raw_data, 
-		nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true, nfolds=nfolds)
+		nb_epochs=nb_epochs, α=α, record_loss=true, use_adam=true, nfolds=nfolds,
+		seed=my_seed
+	)
 end
 
 # ╔═╡ 65af0efe-5c23-4bc8-898a-ef7a5b43e479
@@ -202,7 +206,7 @@ fig_losses
 md"## train model with opt hyper-params"
 
 # ╔═╡ a3457343-dc4d-4046-83d3-b7bdc20c427c
-model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true)
+model, losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true, seed=my_seed)
 
 # ╔═╡ a58e7958-458f-4900-8de3-f4eeae945710
 viz_loss(losses, save_fig=true)
@@ -298,13 +302,13 @@ begin
 end
 
 # ╔═╡ d02ee133-9ee6-4ce0-84db-fcdfb78d6830
-md"ordinary LMF"
+md"ordinary LMF with same hyper-params but γ=0"
 
 # ╔═╡ 12825032-0994-4d7c-90ef-e473596fb42b
 lmf_hyperparams = (;k=opt_hyperparams.k, λ=opt_hyperparams.λ, use_features=false, σ=nothing, γ=0.0)
 
 # ╔═╡ d48a8ef3-4d6e-4378-a206-0901f8cc28e0
-lmf_model, _ = construct_train_model(lmf_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true)
+lmf_model, _ = construct_train_model(lmf_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=true, seed=my_seed)
 
 # ╔═╡ 638b1fa7-b664-4173-8a88-271e7e9ba809
 set_opt_cutoff!(lmf_model, raw_data, data.ids_obs)
@@ -325,7 +329,7 @@ viz_latent_space_3d(lmf_model, raw_data, append_filename="lmf")
 md"## loss without Adam, for comparison"
 
 # ╔═╡ d4ce1f41-c8a3-4524-836e-e3099abfae92
-_, _losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=false)
+_, _losses = construct_train_model(opt_hyperparams, data, raw_data, nb_epochs, record_loss=true, α=α, use_adam=false, seed=my_seed)
 
 # ╔═╡ 621c8c22-e093-4d55-8e80-1d8b81646e69
 viz_loss(_losses, save_fig=true, append_filename="without_adam")
@@ -479,6 +483,7 @@ viz_ml_procedure(data, raw_data, model) # for presentations etc.
 # ╠═006c7e92-e8a5-471e-92be-4d27134295f4
 # ╠═818f126f-61b2-4a8f-8b47-7b7dae87ba47
 # ╠═78ea2361-f2b7-4e0b-ad73-f4ddffecdff7
+# ╠═f1f1fa73-08b4-4d1d-ad5e-f0903519fb8b
 # ╟─59986921-6e8c-4d38-ae3c-7e7ba1bc246d
 # ╠═11ed0c10-24d7-4c4e-a9f3-4625d96ee7ff
 # ╠═298bc445-01cf-4c25-8494-5259f4fa6684

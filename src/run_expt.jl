@@ -1,4 +1,12 @@
-function gen_hyperparams(nb_hyperparams::Int, graph_regularization::Bool)
+function gen_hyperparams(
+        nb_hyperparams::Int, 
+        graph_regularization::Bool; 
+        seed::Union{Nothing, Int}=nothing
+)
+    if ! isnothing(seed)
+        Random.seed!(seed)
+    end
+
     return [(
         k=rand([2, 3]),
         γ=graph_regularization ? rand(Uniform(0, 0.1)) : 0.0,
@@ -45,6 +53,7 @@ end
 function run_experiments(θ::Float64, raw_data::RawData, nruns::Int, mf_settings::NamedTuple)
     perf_data = DataFrame()
     all_metrics = [:f1, :accuracy, :precision, :recall, :balanced_accuracy]
+    Random.seed!(97330)
 
     for r = 1:nruns
         println("run #$r/$nruns")

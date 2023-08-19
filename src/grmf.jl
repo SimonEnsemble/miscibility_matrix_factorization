@@ -173,8 +173,12 @@ function construct_train_model(hyperparams::NamedTuple,
                                α::Float64=0.006, # learning rate
                                cutoff::Float64=0.5,
                                record_loss::Bool=false,
-                               use_adam::Bool=false
+                               use_adam::Bool=false,
+                               seed::Union{Nothing, Int}=nothing
                                )
+    if ! isnothing(seed)
+        Random.seed!(seed)
+    end
     # initialize model
     f_miscible = fraction_miscible(data.M)
     b_guess = log(f_miscible / (1 - f_miscible))
