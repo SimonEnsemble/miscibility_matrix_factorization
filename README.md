@@ -1,7 +1,7 @@
 # graph-regularized logistic matrix factorization for miscibility matrix completion
 
 Julia code to reproduce:
-> D. Behnoudfar, C. Simon, J. Schrier. "Data-driven imputation of miscibility of aqueous solutions via graph-regularized logistic matrix factorization."
+> D. Behnoudfar, C. Simon, J. Schrier. "Data-driven imputation of miscibility of aqueous solutions via graph-regularized logistic matrix factorization." _The Journal of Physical Chemistry, B_ (2023)
 
 * `/src` contains the source code for our package `MiscibilityMF`.
 * `/data` contains the raw data from Peacock et al.
